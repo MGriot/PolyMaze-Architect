@@ -1,0 +1,26 @@
+{
+  "dark": {
+    "BG_COLOR": [20, 20, 20],
+    "WALL_COLOR": [180, 180, 180],
+    "PLAYER_COLOR": [50, 205, 50],
+    "GOAL_COLOR": [220, 20, 60],
+    "PATH_TRACE_COLOR": [65, 105, 225],
+    "COLOR_SOL_BFS": [0, 255, 255],
+    "COLOR_SOL_DFS": [255, 165, 0],
+    "COLOR_SOL_ASTAR": [255, 215, 0],
+    "TEXT_COLOR": [255, 255, 255],
+    "GENERATION_COLOR": [50, 205, 50]
+  },
+  "light": {
+    "BG_COLOR": [240, 240, 240],
+    "WALL_COLOR": [40, 40, 40],
+    "PLAYER_COLOR": [34, 139, 34],
+    "GOAL_COLOR": [178, 34, 34],
+    "PATH_TRACE_COLOR": [30, 144, 255],
+    "COLOR_SOL_BFS": [0, 139, 139],
+    "COLOR_SOL_DFS": [210, 105, 30],
+    "COLOR_SOL_ASTAR": [184, 134, 11],
+    "TEXT_COLOR": [20, 20, 20],
+    "GENERATION_COLOR": [34, 139, 34]
+  }
+}
