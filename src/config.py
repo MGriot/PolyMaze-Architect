@@ -33,7 +33,7 @@ CURRENT_THEME_NAME = DEFAULT_THEME
 # Initialize colors with default theme
 def apply_theme(theme_name):
     global CURRENT_THEME_NAME, BG_COLOR, WALL_COLOR, PLAYER_COLOR, GOAL_COLOR, PATH_TRACE_COLOR
-    global COLOR_SOL_BFS, COLOR_SOL_DFS, COLOR_SOL_ASTAR, TEXT_COLOR, GENERATION_COLOR
+    global COLOR_SOL_BFS, COLOR_SOL_DFS, COLOR_SOL_ASTAR, TEXT_COLOR, GENERATION_COLOR, HIGHLIGHT_COLOR
     
     theme = ALL_THEMES.get(theme_name, ALL_THEMES.get(DEFAULT_THEME))
     if not theme:
@@ -48,6 +48,7 @@ def apply_theme(theme_name):
         COLOR_SOL_ASTAR = (255, 215, 0)
         TEXT_COLOR = (255, 255, 255)
         GENERATION_COLOR = (50, 205, 50)
+        HIGHLIGHT_COLOR = (255, 215, 0)
         return
 
     CURRENT_THEME_NAME = theme_name
@@ -61,6 +62,7 @@ def apply_theme(theme_name):
     COLOR_SOL_ASTAR = tuple(theme["COLOR_SOL_ASTAR"])
     TEXT_COLOR = tuple(theme["TEXT_COLOR"])
     GENERATION_COLOR = tuple(theme["GENERATION_COLOR"])
+    HIGHLIGHT_COLOR = tuple(theme["HIGHLIGHT_COLOR"])
 
 # Initial application
 apply_theme(DEFAULT_THEME)

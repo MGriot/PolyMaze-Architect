@@ -9,7 +9,8 @@
     "COLOR_SOL_DFS": [255, 165, 0],
     "COLOR_SOL_ASTAR": [255, 215, 0],
     "TEXT_COLOR": [255, 255, 255],
-    "GENERATION_COLOR": [50, 205, 50]
+    "GENERATION_COLOR": [50, 205, 50],
+    "HIGHLIGHT_COLOR": [255, 215, 0]
   },
   "light": {
     "BG_COLOR": [240, 240, 240],
@@ -21,6 +22,7 @@
     "COLOR_SOL_DFS": [210, 105, 30],
     "COLOR_SOL_ASTAR": [184, 134, 11],
     "TEXT_COLOR": [20, 20, 20],
-    "GENERATION_COLOR": [34, 139, 34]
+    "GENERATION_COLOR": [34, 139, 34],
+    "HIGHLIGHT_COLOR": [139, 0, 139]
   }
 }

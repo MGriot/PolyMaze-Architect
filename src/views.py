@@ -4,6 +4,9 @@ import arcade.shape_list
 import config
 import math
 import os
+import random
+import time
+import traceback
 from maze_topology import SquareGrid, HexGrid
 from maze_algorithms import (
     RecursiveBacktracker, RandomizedPrims, AldousBroder,
@@ -16,7 +19,7 @@ class MenuView(arcade.View):
         super().__init__()
         self.grid_types = [("Square", SquareGrid), ("Hexagonal", HexGrid)]
         self.grid_idx = 0
-        self.sizes = [("Small", 11, 15), ("Medium", 21, 31), ("Large", 41, 61)]
+        self.sizes = [("Small", 11, 15), ("Medium", 21, 31), ("Large", 31, 41)]
         self.size_idx = 1
         self.generators = [
             ("Backtracker", RecursiveBacktracker), ("Prim's", RandomizedPrims),
@@ -26,64 +29,46 @@ class MenuView(arcade.View):
         ]
         self.gen_idx = 0
         self.animate = True
-        
-        # Performance: Use Text objects
-        self.title_text = None
-        self.option_texts = []
+        self.multi_path = False
+        self.levels = 1
+        self.show_trace = True
 
     def on_show_view(self):
         arcade.set_background_color(config.BG_COLOR)
-        self.setup_text()
-
-    def setup_text(self):
-        cw, ch = config.SCREEN_WIDTH / 2, config.SCREEN_HEIGHT / 2
-        self.title_text = arcade.Text(
-            "POLY MAZE ARCHITECT", cw, ch + 180, config.TEXT_COLOR, 40, anchor_x="center"
-        )
-        self.update_options_text()
-
-    def update_options_text(self):
-        cw, ch = config.SCREEN_WIDTH / 2, config.SCREEN_HEIGHT / 2
-        self.option_texts = []
-        options = [
-            f"G: Grid Shape -> {self.grid_types[self.grid_idx][0]}",
-            f"Z: Size -> {self.sizes[self.size_idx][0]} ({self.sizes[self.size_idx][1]}x{self.sizes[self.size_idx][2]})",
-            f"A: Algorithm -> {self.generators[self.gen_idx][0]}",
-            f"V: Animation -> {'ENABLED' if self.animate else 'DISABLED'}",
-            f"T: Theme -> {config.CURRENT_THEME_NAME.upper()}",
-            "", "PRESS ENTER TO START", "PRESS ESC TO QUIT"
-        ]
-        for i, line in enumerate(options):
-            color = config.WALL_COLOR if ":" in line else arcade.color.GOLD
-            if "Theme" in line: color = config.PLAYER_COLOR
-            self.option_texts.append(arcade.Text(
-                line, cw, ch + 80 - (i * 35), color, 18, anchor_x="center"
-            ))
 
     def on_draw(self):
-        self.clear()
-        if self.title_text:
-            self.title_text.draw()
-        for text in self.option_texts:
-            text.draw()
+        try:
+            self.clear()
+            cw, ch = config.SCREEN_WIDTH / 2, config.SCREEN_HEIGHT / 2
+            arcade.draw_text("POLY MAZE ARCHITECT", cw, ch + 220, config.TEXT_COLOR, font_size=40, anchor_x="center")
+            options = [
+                f"G: Grid Shape -> {self.grid_types[self.grid_idx][0]}",
+                f"Z: Size -> {self.sizes[self.size_idx][0]}",
+                f"A: Algorithm -> {self.generators[self.gen_idx][0]}",
+                f"V: Animation -> {'ENABLED' if self.animate else 'DISABLED'}",
+                f"M: Multi-Path -> {'ON' if self.multi_path else 'OFF'}",
+                f"L: 3D Levels -> {self.levels}",
+                f"R: Show Trace -> {'ON' if self.show_trace else 'OFF'}",
+                f"T: Theme -> {config.CURRENT_THEME_NAME.upper()}",
+                "", "PRESS ENTER TO START", "PRESS ESC TO QUIT"
+            ]
+            for i, line in enumerate(options):
+                color = config.WALL_COLOR if ":" in line else config.HIGHLIGHT_COLOR
+                arcade.draw_text(line, cw, ch + 130 - (i * 32), color, font_size=16, anchor_x="center")
+        except Exception:
+            traceback.print_exc()
 
     def on_key_press(self, key, modifiers):
-        if key == arcade.key.G: 
-            self.grid_idx = (self.grid_idx + 1) % len(self.grid_types)
-            self.update_options_text()
-        elif key == arcade.key.Z: 
-            self.size_idx = (self.size_idx + 1) % len(self.sizes)
-            self.update_options_text()
-        elif key == arcade.key.A: 
-            self.gen_idx = (self.gen_idx + 1) % len(self.generators)
-            self.update_options_text()
-        elif key == arcade.key.V: 
-            self.animate = not self.animate
-            self.update_options_text()
+        if key == arcade.key.G: self.grid_idx = (self.grid_idx + 1) % len(self.grid_types)
+        elif key == arcade.key.Z: self.size_idx = (self.size_idx + 1) % len(self.sizes)
+        elif key == arcade.key.A: self.gen_idx = (self.gen_idx + 1) % len(self.generators)
+        elif key == arcade.key.V: self.animate = not self.animate
+        elif key == arcade.key.M: self.multi_path = not self.multi_path
+        elif key == arcade.key.L: self.levels = (self.levels % 4) + 1
+        elif key == arcade.key.R: self.show_trace = not self.show_trace
         elif key == arcade.key.T:
             config.apply_theme("light" if config.CURRENT_THEME_NAME == "dark" else "dark")
             arcade.set_background_color(config.BG_COLOR)
-            self.setup_text()
         elif key == arcade.key.ENTER: self.start_game()
         elif key == arcade.key.ESCAPE: arcade.exit()
 
@@ -92,225 +77,340 @@ class MenuView(arcade.View):
         _, rows, cols = self.sizes[self.size_idx]
         gen_name, GenClass = self.generators[self.gen_idx]
         game = GameView()
-        game.setup(GridClass, rows, cols, GenClass(), gen_name, self.animate)
+        braid = 0.5 if self.multi_path else 0.0
+        game.setup(GridClass, rows, cols, self.levels, GenClass(), gen_name, self.animate, braid, self.show_trace)
         self.window.show_view(game)
 
 class GameView(arcade.View):
     def __init__(self):
         super().__init__()
         self.grid = None
-        self.wall_list = None 
-        self.wall_shapes = None 
+        self.wall_list_layers = [] 
+        self.wall_shapes_layers = [] 
+        self.stair_shapes_layers = [] 
         self.grid_shapes = None 
         self.player_sprite = None
         self.physics_engine = None
-        self.path_history = []
-        self.gen_name = ""
+        self.current_level = 0
         self.is_hex = False
+        self.braid_pct = 0.0
+        self.path_history = [] 
+        self.show_trace = True
         self.current_solver_idx = 0
-        self.solvers = [
-            (BFS_Solver(), "BFS (Shortest)", config.COLOR_SOL_BFS),
-            (DFS_Solver(), "DFS (Wander)", config.COLOR_SOL_DFS),
-            (AStar_Solver(), "A* (Heuristic)", config.COLOR_SOL_ASTAR)
-        ]
-        self.solution_path = []
-        self.show_solution = False
+        self.solvers = [(BFS_Solver(), "BFS", config.COLOR_SOL_BFS), (DFS_Solver(), "DFS", config.COLOR_SOL_DFS), (AStar_Solver(), "A*", config.COLOR_SOL_ASTAR)]
+        self.solution_path = [] 
+        self.show_solution, self.solving = False, False
+        self.sol_iterator, self.gen_iterator = None, None
         self.generating = False
-        self.gen_iterator = None
-        self.solving = False
-        self.sol_iterator = None
         self.cell_radius = 0
-        
-        # UI Text objects
-        self.hud_text_1 = None
-        self.hud_text_2 = None
-        self.status_text = None
-        self.screenshot_msg_text = None
-        self.screenshot_msg_timer = 0
+        self.hud_text_1, self.hud_text_2, self.status_text = None, None, None
+        self.stair_prompt = None
+        self.current_stair_options = []
+        self.top_margin, self.bottom_margin = 80, 60
+        self.show_map = False
+        self.map_wall_shapes = [] 
+        self.map_stair_shapes = []
+        self.start_time, self.solve_duration, self.game_won = 0, 0, False
+        self.cells_visited = set()
 
-    def setup(self, GridClass, rows, cols, generator, gen_name, animate):
-        self.gen_name, self.is_hex = gen_name, (GridClass == HexGrid)
-        self.grid = GridClass(rows, cols)
-        if self.is_hex:
-            rw, rh = config.SCREEN_WIDTH / ((cols + 1) * math.sqrt(3)), config.SCREEN_HEIGHT / (rows * 1.5 + 1)
-            self.cell_radius = min(rw, rh) * 0.95
-        else:
-            self.cell_radius = min(config.SCREEN_WIDTH / (cols + 2), config.SCREEN_HEIGHT / (rows + 2)) / 2
+    def setup(self, GridClass, rows, cols, levels, generator, gen_name, animate, braid_pct, show_trace):
+        self.gen_name, self.is_hex, self.braid_pct = gen_name, (GridClass == HexGrid), braid_pct
+        self.show_trace, self.grid = show_trace, GridClass(rows, cols, levels)
+        self.current_level, self.path_history, self.solution_path, self.show_map, self.game_won = 0, [], [], False, False
+        self.cells_visited = set()
         
-        # Pre-batch the ghost grid
+        avail_h = config.SCREEN_HEIGHT - self.top_margin - self.bottom_margin
+        if self.is_hex:
+            self.cell_radius = min((config.SCREEN_WIDTH-150)/((cols+1)*math.sqrt(3)), avail_h/(rows*1.5+1)) * 0.95
+        else:
+            self.cell_radius = min((config.SCREEN_WIDTH-150)/(cols+2), avail_h/(rows+2)) / 2
+        
         self.grid_shapes = arcade.shape_list.ShapeElementList()
         R = self.cell_radius
-        for cell in self.grid.each_cell():
-            cx, cy = self.get_pixel(cell.row, cell.column)
-            if self.is_hex:
-                pts = [(cx + R * math.cos(math.radians(a)), cy + R * math.sin(math.radians(a))) for a in [30, 90, 150, 210, 270, 330]]
-                # Fix: create_polygon_outline is not in 3.x, use create_line_loop
-                self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (40, 40, 40), 1))
-            else:
-                self.grid_shapes.append(arcade.shape_list.create_rectangle_outline(cx, cy, R*2, R*2, (40, 40, 40), 1))
+        for r in range(self.grid.rows):
+            for c in range(self.grid.columns):
+                cx, cy = self.get_pixel(r, c)
+                if self.is_hex:
+                    pts = [(cx + R*math.cos(math.radians(a)), cy + R*math.sin(math.radians(a))) for a in [30, 90, 150, 210, 270, 330]]
+                    self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (40, 40, 40), 1))
+                else:
+                    self.grid_shapes.append(arcade.shape_list.create_rectangle_outline(cx, cy, R*2, R*2, (40, 40, 40), 1))
 
         self.setup_ui_text()
-
         if animate:
             self.generating, self.gen_iterator = True, generator.generate_step(self.grid)
         else:
-            generator.generate(self.grid); self.finish_generation()
+            generator.generate(self.grid)
+            if self.braid_pct > 0: self.grid.braid(self.braid_pct)
+            self.finish_generation()
 
     def setup_ui_text(self):
-        self.hud_text_1 = arcade.Text("", 10, config.SCREEN_HEIGHT - 25, config.TEXT_COLOR, 12)
-        self.hud_text_2 = arcade.Text(
-            "S: Sol | TAB: Cycle | T: Theme | P: Print | ESC: Menu", 
-            10, config.SCREEN_HEIGHT - 45, config.WALL_COLOR, 10
-        )
-        self.status_text = arcade.Text("GENERATING...", config.SCREEN_WIDTH/2, 20, config.TEXT_COLOR, 16, anchor_x="center")
-        self.screenshot_msg_text = arcade.Text(
-            "MAZE SAVED AS 'maze_export.png'", config.SCREEN_WIDTH/2, 60, arcade.color.GREEN, 20, anchor_x="center"
-        )
+        self.hud_text_1 = arcade.Text("", 20, config.SCREEN_HEIGHT - 35, config.TEXT_COLOR, font_size=14, bold=True)
+        self.hud_text_2 = arcade.Text("S: Sol | TAB: AI | M: Architectural Map | P: Print | ESC: Menu", 20, config.SCREEN_HEIGHT - 60, config.WALL_COLOR, font_size=11)
+        self.status_text = arcade.Text("GENERATING...", config.SCREEN_WIDTH/2, 30, config.TEXT_COLOR, font_size=16, anchor_x="center")
+        self.stair_prompt = arcade.Text("", config.SCREEN_WIDTH/2, 30, arcade.color.CYAN, font_size=18, anchor_x="center", bold=True)
         self.update_hud()
 
     def update_hud(self):
-        if self.hud_text_1:
-            self.hud_text_1.text = f"{self.gen_name} | {self.solvers[self.current_solver_idx][1]}"
+        l_str = f"Floor {self.current_level+1}/{self.grid.levels}" if self.grid.levels > 1 else ""
+        self.hud_text_1.text = f"{self.gen_name.upper()} ARCHITECT | {l_str}"
 
     def finish_generation(self):
-        self.generating = False
-        self.generate_walls()
-        px, py = self.get_pixel(0, 0)
-        # Hitbox is smaller than visual circle for better movement
-        self.player_sprite = arcade.SpriteCircle(int(self.cell_radius * 0.35), config.PLAYER_COLOR)
-        self.player_sprite.center_x, self.player_sprite.center_y = px, py
-        self.physics_engine = arcade.PhysicsEngineSimple(self.player_sprite, self.wall_list)
-        self.path_history = [(px, py)]
-        self.start_solving()
+        try:
+            if self.braid_pct > 0: self.grid.braid(self.braid_pct)
+            self.generating = False
+            self.generate_walls()
+            self.generate_stairs_visuals()
+            self.generate_map_shapes()
+            px, py = self.get_pixel(0, 0)
+            self.player_sprite = arcade.SpriteCircle(int(self.cell_radius * 0.3), config.PLAYER_COLOR)
+            self.player_sprite.center_x, self.player_sprite.center_y = px, py
+            self.physics_engine = arcade.PhysicsEngineSimple(self.player_sprite, self.wall_list_layers[self.current_level])
+            self.path_history = [((px, py), self.current_level)]
+            self.start_time = time.time()
+            self.cells_visited.add((0, 0, 0))
+            self.update_hud()
+        except Exception: traceback.print_exc()
 
-    def start_solving(self):
-        s, _, _ = self.solvers[self.current_solver_idx]
-        st, en = self.grid.get_cell(0, 0), self.grid.get_cell(self.grid.rows-1, self.grid.columns-1)
-        self.solving, self.sol_iterator = True, s.solve_step(self.grid, st, en)
-
-    def get_pixel(self, r, c):
-        R = self.cell_radius
+    def get_pixel(self, r, c, scale=1.0, offset=(0,0)):
+        R = self.cell_radius * scale
         if not self.is_hex:
             s = R * 2
-            tx, ty = self.grid.columns * s, self.grid.rows * s
-            return (config.SCREEN_WIDTH - tx)/2 + c*s + R, (config.SCREEN_HEIGHT - ty)/2 + r*s + R
+            ox = (config.SCREEN_WIDTH - self.grid.columns * s) / 2 + offset[0]
+            oy = (config.SCREEN_HEIGHT - self.grid.rows * s - self.top_margin + self.bottom_margin) / 2 + offset[1]
+            return ox + c*s + R, oy + r*s + R
         else:
             w, h = math.sqrt(3) * R, 1.5 * R
-            tx, ty = (self.grid.columns + 0.5) * w, (self.grid.rows - 1) * h + 2 * R
-            return (config.SCREEN_WIDTH - tx)/2 + c*w + (w/2 if r % 2 == 1 else 0) + w/2, (config.SCREEN_HEIGHT - ty)/2 + r*h + R
+            ox = (config.SCREEN_WIDTH - (self.grid.columns + 0.5) * w) / 2 + offset[0]
+            oy = (config.SCREEN_HEIGHT - ((self.grid.rows-1)*h + 2*R) - self.top_margin + self.bottom_margin) / 2 + offset[1]
+            return ox + c*w + (w/2 if r % 2 == 1 else 0) + w/2, oy + r*h + R
 
     def generate_walls(self):
-        self.wall_list = arcade.SpriteList(use_spatial_hash=True)
-        self.wall_shapes = arcade.shape_list.ShapeElementList()
-        R, processed = self.cell_radius, set()
-        for cell in self.grid.each_cell():
-            cx, cy = self.get_pixel(cell.row, cell.column)
-            r, c = cell.row, cell.column
-            if not self.is_hex:
-                deltas = [(1, 0, -R, R, R, R), (0, -1, -R, -R, -R, R), (-1, 0, -R, -R, R, -R), (0, 1, R, -R, R, R)]
-                for dr, dc, x1, y1, x2, y2 in deltas:
-                    n = self.grid.get_cell(r+dr, c+dc)
-                    if not n or not cell.is_linked(n): self.add_wall((cx+x1, cy+y1), (cx+x2, cy+y2), processed)
-            else:
-                angles = [30, 90, 150, 210, 270, 330]
-                deltas = [(1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (0, 1)] if r % 2 == 0 else [(1, 1), (1, 0), (0, -1), (-1, 0), (-1, 1), (0, 1)]
-                for i, (dr, dc) in enumerate(deltas):
-                    n = self.grid.get_cell(r+dr, c+dc)
-                    if not n or not cell.is_linked(n):
-                        a1, a2 = math.radians(angles[i]), math.radians(angles[(i+1)%6])
-                        self.add_wall((cx + R*math.cos(a1), cy + R*math.sin(a1)), (cx + R*math.cos(a2), cy + R*math.sin(a2)), processed)
+        self.wall_list_layers = [arcade.SpriteList(use_spatial_hash=True) for _ in range(self.grid.levels)]
+        self.wall_shapes_layers = [arcade.shape_list.ShapeElementList() for _ in range(self.grid.levels)]
+        R = self.cell_radius
+        for l in range(self.grid.levels):
+            processed = set()
+            for r in range(self.grid.rows):
+                for c in range(self.grid.columns):
+                    cell = self.grid.get_cell(r, c, l)
+                    if not cell: continue
+                    cx, cy = self.get_pixel(r, c)
+                    if not self.is_hex:
+                        deltas = [(1, 0, -R, R, R, R), (0, -1, -R, -R, -R, R), (-1, 0, -R, -R, R, -R), (0, 1, R, -R, R, R)]
+                        for dr, dc, x1, y1, x2, y2 in deltas:
+                            n = self.grid.get_cell(r+dr, c+dc, l)
+                            if not n or not cell.is_linked(n): self.add_wall((cx+x1, cy+y1), (cx+x2, cy+y2), processed, l)
+                    else:
+                        angles, deltas = [30, 90, 150, 210, 270, 330], ([(1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (0, 1)] if r % 2 == 0 else [(1, 1), (1, 0), (0, -1), (-1, 0), (-1, 1), (0, 1)])
+                        for i, (dr, dc) in enumerate(deltas):
+                            n = self.grid.get_cell(r+dr, c+dc, l)
+                            if not n or not cell.is_linked(n):
+                                a1, a2 = math.radians(angles[i]), math.radians(angles[(i+1)%6])
+                                self.add_wall((cx+R*math.cos(a1), cy+R*math.sin(a1)), (cx+R*math.cos(a2), cy+R*math.sin(a2)), processed, l)
 
-    def add_wall(self, p1, p2, processed):
+    def add_wall(self, p1, p2, processed, level):
         wid = tuple(sorted([(round(p1[0],1), round(p1[1],1)), (round(p2[0],1), round(p2[1],1))]))
         if wid in processed: return
         processed.add(wid)
         mx, my = (p1[0]+p2[0])/2, (p1[1]+p2[1])/2
         l, ang = math.sqrt((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2), math.degrees(math.atan2(p2[1]-p1[1], p2[0]-p1[0]))
-        # Physics wall
-        wall = arcade.SpriteSolidColor(int(l+1), config.WALL_THICKNESS, config.WALL_COLOR)
+        wall = arcade.SpriteSolidColor(int(l+1), config.WALL_THICKNESS + 2, config.WALL_COLOR)
         wall.center_x, wall.center_y, wall.angle = mx, my, ang
-        self.wall_list.append(wall)
-        # Visual wall
-        self.wall_shapes.append(arcade.shape_list.create_line(p1[0], p1[1], p2[0], p2[1], config.WALL_COLOR, config.WALL_THICKNESS))
+        self.wall_list_layers[level].append(wall)
+        self.wall_shapes_layers[level].append(arcade.shape_list.create_line(p1[0], p1[1], p2[0], p2[1], config.WALL_COLOR, config.WALL_THICKNESS))
+
+    def generate_stairs_visuals(self):
+        self.stair_shapes_layers = [arcade.shape_list.ShapeElementList() for _ in range(self.grid.levels)]
+        for l in range(self.grid.levels):
+            for r in range(self.grid.rows):
+                for c in range(self.grid.columns):
+                    cell = self.grid.get_cell(r, c, l)
+                    if not cell: continue
+                    cx, cy = self.get_pixel(r, c)
+                    for link in cell.get_links():
+                        if link.level > cell.level:
+                            self.stair_shapes_layers[l].append(arcade.shape_list.create_polygon([(cx, cy+8), (cx-8, cy-6), (cx+8, cy-6)], arcade.color.AZURE))
+                        elif link.level < cell.level:
+                            self.stair_shapes_layers[l].append(arcade.shape_list.create_polygon([(cx, cy-8), (cx-8, cy+6), (cx+8, cy+6)], arcade.color.BROWN))
+
+    def generate_map_shapes(self):
+        self.map_wall_shapes = [arcade.shape_list.ShapeElementList() for _ in range(self.grid.levels)]
+        self.map_stair_shapes = [arcade.shape_list.ShapeElementList() for _ in range(self.grid.levels)]
+        m_scale, v_gap = 0.35, config.SCREEN_HEIGHT * 0.22
+        for l in range(self.grid.levels):
+            off = (0, (l - (self.grid.levels-1)/2) * v_gap)
+            for r in range(self.grid.rows):
+                for c in range(self.grid.columns):
+                    cell = self.grid.get_cell(r, c, l)
+                    if not cell: continue
+                    cx, cy = self.get_pixel(r, c, m_scale, off)
+                    R = self.cell_radius * m_scale
+                    if not self.is_hex:
+                        deltas = [(1, 0, -R, R, R, R), (0, -1, -R, -R, -R, R), (-1, 0, -R, -R, R, -R), (0, 1, R, -R, R, R)]
+                        for dr, dc, x1, y1, x2, y2 in deltas:
+                            neighbor = self.grid.get_cell(r+dr, c+dc, l)
+                            if not neighbor or not cell.is_linked(neighbor):
+                                self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx+x1, cy+y1, cx+x2, cy+y2, config.WALL_COLOR, 1))
+                    else:
+                        angles, deltas = [30, 90, 150, 210, 270, 330], ([(1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (0, 1)] if r % 2 == 0 else [(1, 1), (1, 0), (0, -1), (-1, 0), (-1, 1), (0, 1)])
+                        for i, (dr, dc) in enumerate(deltas):
+                            neighbor = self.grid.get_cell(r+dr, c+dc, l)
+                            if not neighbor or not cell.is_linked(neighbor):
+                                a1, a2 = math.radians(angles[i]), math.radians(angles[(i+1)%6])
+                                self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx+R*math.cos(a1), cy+R*math.sin(a1), cx+R*math.cos(a2), cy+R*math.sin(a2), config.WALL_COLOR, 1))
+                    for link in cell.get_links():
+                        if link.level != cell.level:
+                            col = arcade.color.AZURE if link.level > cell.level else arcade.color.BROWN
+                            self.map_stair_shapes[l].append(arcade.shape_list.create_rectangle_filled(cx, cy, 4, 4, col))
+
+    def draw_map_overlay(self):
+        arcade.draw_lbwh_rectangle_filled(0, 0, config.SCREEN_WIDTH, config.SCREEN_HEIGHT, (0,0,0,235))
+        arcade.draw_text("EXPLODED ARCHITECTURAL VIEW", config.SCREEN_WIDTH/2, config.SCREEN_HEIGHT-40, arcade.color.CYAN, font_size=20, anchor_x="center", bold=True)
+        m_scale, v_gap = 0.35, config.SCREEN_HEIGHT * 0.22
+        for l in range(self.grid.levels):
+            off = (0, (l - (self.grid.levels-1)/2) * v_gap)
+            p_center = self.get_pixel(self.grid.rows//2, self.grid.columns//2, m_scale, off)
+            fw, fh = (self.grid.columns+1)*self.cell_radius*2*m_scale, (self.grid.rows+1)*self.cell_radius*2*m_scale
+            arcade.draw_lbwh_rectangle_filled(p_center[0]-fw/2, p_center[1]-fh/2, fw, fh, (50, 50, 50, 100))
+            self.map_wall_shapes[l].draw(); self.map_stair_shapes[l].draw()
+            p_lab = self.get_pixel(self.grid.rows-1, 0, m_scale, off)
+            arcade.draw_text(f"FLOOR {l+1}", p_lab[0], p_lab[1]+10, arcade.color.CYAN if l == self.current_level else arcade.color.GRAY, font_size=12)
+            if l == self.current_level:
+                px, py = self.get_pixel(self.get_grid_pos(self.player_sprite.center_x, self.player_sprite.center_y)[0], self.get_grid_pos(self.player_sprite.center_x, self.player_sprite.center_y)[1], m_scale, off)
+                arcade.draw_circle_filled(px, py, 5, config.PLAYER_COLOR)
+
+    def draw_minimap(self):
+        if self.grid.levels <= 1: return
+        x, y = config.SCREEN_WIDTH - 40, config.SCREEN_HEIGHT - 100
+        arcade.draw_lbwh_rectangle_filled(x-30, y-60, 60, 120, (0, 0, 0, 120))
+        start_y = y - (self.grid.levels * 25) / 2 + 10
+        for i in range(self.grid.levels):
+            color = arcade.color.CYAN if i == self.current_level else (100, 100, 100, 150)
+            arcade.draw_lbwh_rectangle_filled(x-20, start_y + i*25 - 10, 40, 20, color)
+            arcade.draw_text(f"F{i+1}", x, start_y + i*25, arcade.color.WHITE, font_size=10, anchor_x="center", anchor_y="center")
+            if i == self.grid.levels - 1: arcade.draw_circle_filled(x + 12, start_y + i*25 + 5, 3, config.GOAL_COLOR)
+
+    def draw_victory(self):
+        arcade.draw_lbwh_rectangle_filled(0, 0, config.SCREEN_WIDTH, config.SCREEN_HEIGHT, (0,0,0,200))
+        cw, ch = config.SCREEN_WIDTH/2, config.SCREEN_HEIGHT/2
+        arcade.draw_text("CONGRATULATIONS!", cw, ch + 80, arcade.color.GOLD, font_size=36, anchor_x="center", bold=True)
+        stats = [f"Time: {int(self.solve_duration)}s", f"Cells: {len(self.cells_visited)}", f"Complexity: {self.grid.size()}", "", "PRESS ENTER TO RESTART"]
+        for i, line in enumerate(stats):
+            arcade.draw_text(line, cw, ch - 20 - (i*30), config.HIGHLIGHT_COLOR if "ENTER" in line else config.TEXT_COLOR, font_size=16, anchor_x="center")
 
     def on_draw(self):
-        self.clear()
-        if self.generating:
-            self.grid_shapes.draw()
-            for cell in self.grid.each_cell():
-                cx, cy = self.get_pixel(cell.row, cell.column)
-                for link in cell.get_links():
-                    lx, ly = self.get_pixel(link.row, link.column)
-                    arcade.draw_line(cx, cy, lx, ly, config.GENERATION_COLOR, 2)
-            self.status_text.draw()
-            return
-        
-        self.wall_shapes.draw()
-        gx, gy = self.get_pixel(self.grid.rows-1, self.grid.columns-1)
-        arcade.draw_circle_filled(gx, gy, self.cell_radius * 0.4, config.GOAL_COLOR)
-        
-        if self.show_solution and len(self.solution_path) > 1:
-            arcade.draw_line_strip(self.solution_path, self.solvers[self.current_solver_idx][2], 4)
-        
-        if len(self.path_history) > 1:
-            arcade.draw_line_strip(self.path_history, config.PATH_TRACE_COLOR, 2)
-        
-        if self.player_sprite:
-            arcade.draw_circle_filled(
-                self.player_sprite.center_x, self.player_sprite.center_y, 
-                self.player_sprite.width/2, config.PLAYER_COLOR
-            )
-        
-        self.hud_text_1.draw()
-        self.hud_text_2.draw()
-        
-        if self.screenshot_msg_timer > 0:
-            self.screenshot_msg_text.draw()
-            self.screenshot_msg_timer -= 1
+        try:
+            self.clear()
+            if self.generating:
+                self.grid_shapes.draw()
+                for r in range(self.grid.rows):
+                    for c in range(self.grid.columns):
+                        cell = self.grid.get_cell(r, c, 0)
+                        if not cell: continue
+                        cx, cy = self.get_pixel(r, c)
+                        for link in cell.get_links():
+                            if link.level == 0:
+                                lx, ly = self.get_pixel(link.row, link.column)
+                                arcade.draw_line(cx, cy, lx, ly, config.GENERATION_COLOR, 2)
+                self.status_text.draw(); return
+            if self.show_map: self.draw_map_overlay(); return
+            self.wall_shapes_layers[self.current_level].draw(); self.stair_shapes_layers[self.current_level].draw()
+            if self.show_solution and self.solution_path:
+                pts = []
+                for r, c, l in self.solution_path:
+                    if l == self.current_level: pts.append(self.get_pixel(r, c))
+                    else:
+                        if len(pts) > 1: arcade.draw_line_strip(pts, self.solvers[self.current_solver_idx][2], 4)
+                        pts = []
+                if len(pts) > 1: arcade.draw_line_strip(pts, self.solvers[self.current_solver_idx][2], 4)
+            if self.show_trace and len(self.path_history) > 1:
+                pts = [p for p, l in self.path_history if l == self.current_level]
+                if len(pts) > 1: arcade.draw_line_strip(pts, config.PATH_TRACE_COLOR, 2)
+            if self.current_level == self.grid.levels - 1:
+                gx, gy = self.get_pixel(self.grid.rows-1, self.grid.columns-1)
+                arcade.draw_circle_filled(gx, gy, self.cell_radius * 0.4, config.GOAL_COLOR)
+            if self.player_sprite: arcade.draw_circle_filled(self.player_sprite.center_x, self.player_sprite.center_y, self.player_sprite.width/2, config.PLAYER_COLOR)
+            self.hud_text_1.draw(); self.hud_text_2.draw(); self.draw_minimap()
+            if self.current_stair_options: self.stair_prompt.draw()
+            if self.game_won: self.draw_victory()
+        except Exception: traceback.print_exc()
 
     def on_update(self, delta_time):
-        if self.generating:
-            try:
-                # Optimized: More steps per frame during generation
-                for _ in range(30): next(self.gen_iterator)
-            except StopIteration: self.finish_generation()
-            return
-        if self.solving:
-            try:
-                for _ in range(5):
-                    self.solution_path = [self.get_pixel(r, c) for r, c in next(self.sol_iterator)]
-            except StopIteration: self.solving = False
-            return
-        if self.physics_engine:
-            self.physics_engine.update()
-            px, py = self.player_sprite.center_x, self.player_sprite.center_y
-            if not self.path_history or (px-self.path_history[-1][0])**2 + (py-self.path_history[-1][1])**2 > 25:
-                self.path_history.append((px, py))
+        try:
+            if self.generating:
+                try:
+                    for _ in range(50): next(self.gen_iterator)
+                except StopIteration: self.finish_generation()
+                return
+            if self.game_won: return
+            if self.solving and self.sol_iterator:
+                try:
+                    for _ in range(5): self.solution_path = next(self.sol_iterator)
+                except StopIteration: self.solving = False
+            if self.physics_engine and not self.show_map:
+                self.physics_engine.update()
+                px, py = self.player_sprite.center_x, self.player_sprite.center_y
+                r, c = self.get_grid_pos(px, py)
+                self.cells_visited.add((r, c, self.current_level))
+                if self.current_level == self.grid.levels - 1 and r == self.grid.rows-1 and c == self.grid.columns-1:
+                    self.game_won, self.solve_duration = True, time.time() - self.start_time; return
+                cell = self.grid.get_cell(r, c, self.current_level)
+                if cell:
+                    if self.show_trace and (not self.path_history or (px-self.path_history[-1][0][0])**2 + (py-self.path_history[-1][0][1])**2 > 25):
+                        self.path_history.append(((px, py), self.current_level))
+                    cx, cy = self.get_pixel(r, c)
+                    self.current_stair_options = []
+                    if (px - cx)**2 + (py - cy)**2 < 225:
+                        for link in cell.get_links():
+                            if link.level > cell.level: self.current_stair_options.append((link.level, "U"))
+                            elif link.level < cell.level: self.current_stair_options.append((link.level, "D"))
+                    self.stair_prompt.text = f"STAIRS: Press {' / '.join(['['+o[1]+']' for o in self.current_stair_options])} to move" if self.current_stair_options else ""
+        except Exception: traceback.print_exc()
+
+    def get_grid_pos(self, x, y):
+        R = self.cell_radius
+        if not self.is_hex:
+            s = R * 2
+            ox, oy = (config.SCREEN_WIDTH - self.grid.columns * s) / 2, (config.SCREEN_HEIGHT - self.grid.rows * s - self.top_margin + self.bottom_margin) / 2
+            return int((y - oy) // s), int((x - ox) // s)
+        else:
+            w, h = math.sqrt(3) * R, 1.5 * R
+            ox = (config.SCREEN_WIDTH - (self.grid.columns + 0.5) * w) / 2
+            oy = (config.SCREEN_HEIGHT - ((self.grid.rows-1)*h + 2*R) - self.top_margin + self.bottom_margin) / 2
+            r = int((y - oy - R) / h + 0.5)
+            c = int((x - ox - (w/2 if r % 2 == 1 else 0) - w/2) / w + 0.5)
+            return max(0, min(r, self.grid.rows-1)), max(0, min(c, self.grid.columns-1))
 
     def on_key_press(self, key, modifiers):
         if self.generating: return
+        if self.game_won:
+            if key == arcade.key.ENTER: self.window.show_view(MenuView())
+            return
+        if key == arcade.key.M: self.show_map = not self.show_map; return
+        if self.show_map: return
         s = config.MOVEMENT_SPEED
         if key == arcade.key.UP: self.player_sprite.change_y = s
         elif key == arcade.key.DOWN: self.player_sprite.change_y = -s
-        elif key == arcade.key.LEFT: self.player_sprite.change_x = s # wait, left should be -s
+        elif key == arcade.key.LEFT: self.player_sprite.change_x = -s
         elif key == arcade.key.RIGHT: self.player_sprite.change_x = s
-        elif key == arcade.key.S: self.show_solution = not self.show_solution
-        elif key == arcade.key.P:
-            arcade.get_image().save("maze_export.png")
-            self.screenshot_msg_timer = 120
-        elif key == arcade.key.T:
-            config.apply_theme("light" if config.CURRENT_THEME_NAME == "dark" else "dark")
-            arcade.set_background_color(config.BG_COLOR)
-            self.generate_walls()
-            self.setup_ui_text()
-            self.physics_engine = arcade.PhysicsEngineSimple(self.player_sprite, self.wall_list)
-            self.player_sprite.color = config.PLAYER_COLOR
+        elif key in [arcade.key.U, arcade.key.D]:
+            td = "U" if key == arcade.key.U else "D"
+            for lv, ds in self.current_stair_options:
+                if ds == td:
+                    self.current_level = lv
+                    r, c = self.get_grid_pos(self.player_sprite.center_x, self.player_sprite.center_y)
+                    self.player_sprite.center_x, self.player_sprite.center_y = self.get_pixel(r, c)
+                    self.physics_engine = arcade.PhysicsEngineSimple(self.player_sprite, self.wall_list_layers[self.current_level])
+                    self.update_hud(); break
+        elif key == arcade.key.S:
+            self.show_solution = not self.show_solution
+            if self.show_solution:
+                self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(0,0,0), self.grid.get_cell(self.grid.rows-1,self.grid.columns-1,self.grid.levels-1))
         elif key == arcade.key.TAB:
-            self.current_solver_idx = (self.current_solver_idx + 1) % len(self.solvers)
-            self.update_hud()
-            s, _, _ = self.solvers[self.current_solver_idx]
-            st, en = self.grid.get_cell(0, 0), self.grid.get_cell(self.grid.rows-1, self.grid.columns-1)
-            self.solving, self.sol_iterator = True, s.solve_step(self.grid, st, en)
+            self.current_solver_idx = (self.current_solver_idx + 1) % len(self.solvers); self.update_hud()
+            if self.show_solution: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(0,0,0), self.grid.get_cell(self.grid.rows-1,self.grid.columns-1,self.grid.levels-1))
+        elif key == arcade.key.P: arcade.get_image().save("maze_export.png")
         elif key == arcade.key.ESCAPE: self.window.show_view(MenuView())
 
     def on_key_release(self, key, modifiers):
