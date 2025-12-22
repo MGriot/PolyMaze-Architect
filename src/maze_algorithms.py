@@ -121,6 +121,83 @@ class Sidewinder(MazeGenerator):
                         east = grid.get_cell(r, c + 1, l)
                         if east: cell.link(east); yield cell, east
 
+class HuntAndKill(MazeGenerator):
+    def generate_step(self, grid: Grid):
+        current = grid.random_cell()
+        while current:
+            unvisited_neighbors = [n for n in current.neighbors if not n.get_links()]
+            if unvisited_neighbors:
+                neighbor = random.choice(unvisited_neighbors)
+                current.link(neighbor)
+                yield current, neighbor
+                current = neighbor
+            else:
+                current = None
+                for cell in grid.each_cell():
+                    visited_neighbors = [n for n in cell.neighbors if n.get_links()]
+                    if not cell.get_links() and visited_neighbors:
+                        current = cell
+                        neighbor = random.choice(visited_neighbors)
+                        current.link(neighbor)
+                        yield current, neighbor
+                        break
+
+class Ellers(MazeGenerator):
+    def generate_step(self, grid: Grid):
+        # Works best on 2D, but we'll iterate levels too
+        for l in range(grid.levels):
+            row_sets = {} # cell -> set_id
+            next_set_id = 0
+            
+            for r in range(grid.rows):
+                row_cells = [grid.get_cell(r, c, l) for c in range(grid.columns)]
+                # 1. Initialize
+                for cell in row_cells:
+                    if cell not in row_sets:
+                        row_sets[cell] = next_set_id
+                        next_set_id += 1
+                
+                # 2. Merge Right
+                for c in range(grid.columns - 1):
+                    cell = row_cells[c]
+                    next_cell = row_cells[c+1]
+                    if row_sets[cell] != row_sets[next_cell]:
+                        if r == grid.rows - 1 or random.choice([True, False]):
+                            cell.link(next_cell)
+                            old_set, new_set = row_sets[next_cell], row_sets[cell]
+                            # Merge sets - naive linear scan is fine for these sizes
+                            for k, v in list(row_sets.items()):
+                                if v == old_set: row_sets[k] = new_set
+                            yield cell, next_cell
+                
+                # 3. Vertical (Down)
+                if r < grid.rows - 1:
+                    sets = {}
+                    for cell in row_cells:
+                        sid = row_sets[cell]
+                        if sid not in sets: sets[sid] = []
+                        sets[sid].append(cell)
+                    
+                    for sid, cells in sets.items():
+                        random.shuffle(cells)
+                        count = 0
+                        for cell in cells:
+                            # At least one per set, then random
+                            if count == 0 or random.choice([True, False]):
+                                bottom = grid.get_cell(r+1, cell.column, l)
+                                if bottom:
+                                    cell.link(bottom)
+                                    row_sets[bottom] = sid
+                                    yield cell, bottom
+                                    count += 1
+            
+            # Link levels (basic vertical shaft)
+            if l < grid.levels - 1:
+                u = grid.get_cell(random.randint(0, grid.rows-1), random.randint(0, grid.columns-1), l)
+                v = grid.get_cell(u.row, u.column, l+1)
+                if u and v:
+                    u.link(v); yield u, v
+
 class RecursiveDivision(MazeGenerator):
     def generate_step(self, grid: Grid):
         for cell in grid.each_cell():
