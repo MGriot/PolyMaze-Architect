@@ -7,7 +7,7 @@ import os
 import random
 import time
 import traceback
-from typing import List, Tuple, Optional, type, Iterator
+from typing import List, Tuple, Optional, Type, Iterator
 from maze_topology import SquareCellGrid, HexCellGrid, TriCellGrid, PolarCellGrid, Grid, Cell
 from maze_algorithms import (
     RecursiveBacktracker, RandomizedPrims, AldousBroder,
@@ -20,13 +20,13 @@ from renderer import MazeRenderer
 class MenuView(arcade.View):
     def __init__(self):
         super().__init__()
-        self.cell_types: List[Tuple[str, type]] = [("Square", SquareCellGrid), ("Hexagonal", HexCellGrid), ("Triangular", TriCellGrid), ("Polar", PolarCellGrid)]
+        self.cell_types: List[Tuple[str, Type[Grid]]] = [("Square", SquareCellGrid), ("Hexagonal", HexCellGrid), ("Triangular", TriCellGrid), ("Polar", PolarCellGrid)]
         self.cell_idx: int = 0
         self.shapes: List[str] = ["rectangle", "circle", "triangle", "hexagon"]
         self.shape_idx: int = 0
         self.sizes: List[Tuple[str, int, int]] = [("Small", 11, 15), ("Medium", 21, 31), ("Large", 31, 41)]
         self.size_idx: int = 1
-        self.generators: List[Tuple[str, type]] = [
+        self.generators: List[Tuple[str, Type[MazeGenerator]]] = [
             ("Backtracker", RecursiveBacktracker), ("Prim's", RandomizedPrims),
             ("Aldous-Broder", AldousBroder), ("Wilson's", Wilsons),
             ("Binary Tree", BinaryTree), ("Kruskal's", Kruskals),
@@ -117,6 +117,7 @@ class GameView(arcade.View):
         self.stair_shapes_layers: List[arcade.shape_list.ShapeElementList] = [] 
         self.grid_shapes: Optional[arcade.shape_list.ShapeElementList] = None 
         self.player_sprite: Optional[arcade.Sprite] = None
+        self.player_list: arcade.SpriteList = arcade.SpriteList()
         self.player_cell: Optional[Cell] = None
         self.target_pos: Optional[Tuple[float, float]] = None
         self.current_level: int = 0
@@ -148,7 +149,7 @@ class GameView(arcade.View):
         self.start_pos: Tuple[int, int, int] = (0,0,0)
         self.end_pos: Tuple[int, int, int] = (0,0,0)
 
-    def setup(self, GridClass: type, shape: str, rows: int, cols: int, levels: int, generator: MazeGenerator, gen_name: str, animate: bool, braid_pct: float, show_trace: bool, random_endpoints: bool):
+    def setup(self, GridClass: Type[Grid], shape: str, rows: int, cols: int, levels: int, generator: MazeGenerator, gen_name: str, animate: bool, braid_pct: float, show_trace: bool, random_endpoints: bool):
         self.gen_name, self.braid_pct = gen_name, braid_pct
         self.grid = GridClass(rows, cols, levels)
         self.grid.mask_shape(shape)
@@ -157,25 +158,26 @@ class GameView(arcade.View):
         elif GridClass == PolarCellGrid: gtype = "polar"
         else: gtype = "rect"
         avail_h = config.SCREEN_HEIGHT - self.top_margin - self.bottom_margin
-        if gtype == "hex": rad = min((config.SCREEN_WIDTH-150)/((cols+1)*math.sqrt(3)), avail_h/(rows*1.5+1)) * 0.95
-        elif gtype == "tri": rad = min((config.SCREEN_WIDTH-150)/(cols*math.sqrt(3)/2 + 1), avail_h/(rows + 1.5)) * 0.9
-        elif gtype == "polar": rad = min((config.SCREEN_WIDTH-100)/2, (avail_h)/2) / (rows + 3) / 1.5
-        else: rad = min((config.SCREEN_WIDTH-150)/(cols+2), avail_h/(rows+2)) / 2
+        if gtype == "hex": rad = avail_h / (rows * 1.5 + 0.5)
+        elif gtype == "tri": rad = avail_h / (rows * 1.5 + 1)
+        elif gtype == "polar": rad = avail_h / (2 * (rows + 3))
+        else: rad = avail_h / (2 * rows + 2)
         self.renderer = MazeRenderer(self.grid, rad, gtype, self.top_margin, self.bottom_margin)
         self.show_trace, self.current_level, self.path_history, self.solution_path, self.show_map, self.game_won = show_trace, 0, [], [], False, False
         self.cells_visited = set()
+        self.player_list = arcade.SpriteList()
         self.grid_shapes = arcade.shape_list.ShapeElementList()
         for cell in self.grid.each_cell():
             if cell.level == 0:
                 cx, cy = self.renderer.get_pixel(cell.row, cell.column)
                 if gtype == "hex":
                     pts = [(cx + rad*math.cos(math.radians(a)), cy + rad*math.sin(math.radians(a))) for a in [30, 90, 150, 210, 270, 330]]
-                    self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (40, 40, 40), 1))
+                    self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (100, 100, 100), 1))
                 elif gtype == "tri":
                     pts = self.renderer.get_tri_verts(cell.row, cell.column, cx, cy, rad)
-                    self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (40, 40, 40), 1))
+                    self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (100, 100, 100), 1))
                 elif gtype == "rect":
-                    self.grid_shapes.append(arcade.shape_list.create_rectangle_outline(cx, cy, rad*2, rad*2, (40, 40, 40), 1))
+                    self.grid_shapes.append(arcade.shape_list.create_rectangle_outline(cx, cy, rad*2, rad*2, (100, 100, 100), 1))
         self.setup_ui_text()
         valid_cells = list(self.grid.each_cell())
         if valid_cells:
@@ -215,13 +217,11 @@ class GameView(arcade.View):
             self.player_cell = self.grid.get_cell(sr, sc, sl)
             px, py = self.renderer.get_pixel(sr, sc)
             rad = int(self.renderer.cell_radius * 0.3)
-            self.player_sprite = arcade.Sprite(arcade.make_circle_texture(rad * 2, config.PLAYER_COLOR))
+            self.player_sprite = arcade.Sprite(texture=arcade.make_circle_texture(rad * 2, config.PLAYER_COLOR))
             self.player_sprite.center_x, self.player_sprite.center_y = px, py
-            self.target_pos = (px, py)
-            self.path_history = [((px, py), sl)]
-            self.start_time = time.time()
-            self.cells_visited.add((sr, sc, sl))
-            self.update_hud()
+            self.player_list.append(self.player_sprite)
+            self.target_pos = (px, py); self.path_history = [((px, py), sl)]
+            self.start_time, self.cells_visited = time.time(), set([(sr, sc, sl)]); self.update_hud()
         except Exception: traceback.print_exc()
 
     def generate_map_shapes(self):
@@ -297,10 +297,7 @@ class GameView(arcade.View):
             if self.current_level == self.end_pos[2]:
                 gx, gy = self.renderer.get_pixel(self.end_pos[0], self.end_pos[1])
                 arcade.draw_circle_filled(gx, gy, self.renderer.cell_radius * 0.4, config.GOAL_COLOR)
-            if self.player_sprite: self.player_sprite.draw()
-            if self.hud_text_1: self.hud_text_1.draw()
-            if self.hud_text_2: self.hud_text_2.draw()
-            self.draw_minimap()
+            self.player_list.draw(); self.hud_text_1.draw(); self.hud_text_2.draw(); self.draw_minimap()
             if self.current_stair_options and self.stair_prompt: self.stair_prompt.draw()
             if self.game_won: self.draw_victory()
         except Exception: traceback.print_exc()
