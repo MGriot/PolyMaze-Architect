@@ -77,7 +77,7 @@ class Grid:
                     nx, ny = self._get_normalized_coords(cell.row, cell.column)
                     keep = True
                     if shape == "circle":
-                        keep = (nx**2 + ny**2) <= 1.1 # Buffer for edges
+                        keep = (nx**2 + ny**2) <= 1.1 
                     elif shape == "triangle":
                         keep = (ny > -0.7) and (ny < 1.732 * nx + 1.2) and (ny < -1.732 * nx + 1.2)
                     elif shape == "hexagon":

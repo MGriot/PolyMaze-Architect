@@ -142,25 +142,18 @@ class GameView(arcade.View):
         self.gen_name, self.braid_pct = gen_name, braid_pct
         self.grid = GridClass(rows, cols, levels)
         self.grid.mask_shape(shape)
-        
-        # Determine grid type for renderer
         if GridClass == HexCellGrid: gtype = "hex"
         elif GridClass == TriCellGrid: gtype = "tri"
         elif GridClass == PolarCellGrid: gtype = "polar"
         else: gtype = "rect"
-        
-        # Radius calculation
         avail_h = config.SCREEN_HEIGHT - self.top_margin - self.bottom_margin
         if gtype == "hex": rad = min((config.SCREEN_WIDTH-150)/((cols+1)*math.sqrt(3)), avail_h/(rows*1.5+1)) * 0.95
         elif gtype == "tri": rad = min((config.SCREEN_WIDTH-150)/(cols*math.sqrt(3)/2 + 1), avail_h/(rows + 1.5)) * 0.9
         elif gtype == "polar": rad = min((config.SCREEN_WIDTH-100)/2, (avail_h)/2) / (rows + 3) / 1.5
         else: rad = min((config.SCREEN_WIDTH-150)/(cols+2), avail_h/(rows+2)) / 2
-        
         self.renderer = MazeRenderer(self.grid, rad, gtype, self.top_margin, self.bottom_margin)
         self.show_trace, self.current_level, self.path_history, self.solution_path, self.show_map, self.game_won = show_trace, 0, [], [], False, False
         self.cells_visited = set()
-        
-        # Grid outline for animation
         self.grid_shapes = arcade.shape_list.ShapeElementList()
         for cell in self.grid.each_cell():
             if cell.level == 0:
@@ -173,7 +166,6 @@ class GameView(arcade.View):
                     self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (40, 40, 40), 1))
                 elif gtype == "rect":
                     self.grid_shapes.append(arcade.shape_list.create_rectangle_outline(cx, cy, rad*2, rad*2, (40, 40, 40), 1))
-
         self.setup_ui_text()
         valid_cells = list(self.grid.each_cell())
         if valid_cells:
@@ -187,7 +179,6 @@ class GameView(arcade.View):
                 self.start_pos = (s_cell.row, s_cell.column, s_cell.level)
                 self.end_pos = (e_cell.row, e_cell.column, e_cell.level)
         else: self.start_pos, self.end_pos = (0,0,0), (0,0,0)
-
         if animate: self.generating, self.gen_iterator = True, generator.generate_step(self.grid)
         else:
             generator.generate(self.grid)
@@ -214,12 +205,8 @@ class GameView(arcade.View):
             sr, sc, sl = self.start_pos
             self.player_cell = self.grid.get_cell(sr, sc, sl)
             px, py = self.renderer.get_pixel(sr, sc)
-            
-            # Procedural circle sprite
             rad = int(self.renderer.cell_radius * 0.3)
-            self.player_sprite = arcade.Sprite(
-                arcade.make_circle_texture(rad * 2, config.PLAYER_COLOR)
-            )
+            self.player_sprite = arcade.Sprite(arcade.make_circle_texture(rad * 2, config.PLAYER_COLOR))
             self.player_sprite.center_x, self.player_sprite.center_y = px, py
             self.target_pos = (px, py)
             self.path_history = [((px, py), sl)]
@@ -264,7 +251,8 @@ class GameView(arcade.View):
                             self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx+R*math.cos(a1), cy+R*math.sin(a1), cx+R*math.cos(a2), cy+R*math.sin(a2), config.WALL_COLOR, 1))
                 elif self.renderer.grid_type == "tri":
                     p1, p2, p3 = self.renderer.get_tri_verts(r, c, cx, cy, R)
-                    edges = [(p2, p3, (-1, 0) if (r+c)%2==0 else (1,0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
+                    if (r + c) % 2 == 0: edges = [(p2, p3, (-1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
+                    else: edges = [(p2, p3, (1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
                     for v1, v2, (dr, dc) in edges:
                         n = self.grid.get_cell(r+dr, c+dc, l)
                         if not n or not cell.is_linked(n): self.map_wall_shapes[l].append(arcade.shape_list.create_line(v1[0], v1[1], v2[0], v2[1], config.WALL_COLOR, 1))
@@ -317,8 +305,7 @@ class GameView(arcade.View):
         cw, ch = config.SCREEN_WIDTH/2, config.SCREEN_HEIGHT/2
         arcade.draw_text("CONGRATULATIONS!", cw, ch + 80, arcade.color.GOLD, font_size=36, anchor_x="center", bold=True)
         stats = [f"Time: {int(self.solve_duration)}s", f"Cells: {len(self.cells_visited)}", f"Complexity: {self.grid.size()}", "", "PRESS ENTER TO RESTART"]
-        for i, line in enumerate(stats):
-            arcade.draw_text(line, cw, ch - 20 - (i*30), config.HIGHLIGHT_COLOR if "ENTER" in line else config.TEXT_COLOR, font_size=16, anchor_x="center")
+        for i, line in enumerate(stats): arcade.draw_text(line, cw, ch - 20 - (i*30), config.HIGHLIGHT_COLOR if "ENTER" in line else config.TEXT_COLOR, font_size=16, anchor_x="center")
 
     def on_draw(self):
         try:
@@ -330,7 +317,7 @@ class GameView(arcade.View):
                     for link in cell.get_links():
                         if link.level == cell.level:
                             lx, ly = self.renderer.get_pixel(link.row, link.column)
-                            arcade.draw_line(cx, cy, lx, ly, config.GENERATION_COLOR, 2)
+                            arcade.draw_line(cx, cy, lx, ly, config.GENERATION_COLOR, 3)
                 self.status_text.draw(); return
             if self.show_map: self.draw_map_overlay(); return
             self.wall_shapes_layers[self.current_level].draw()
@@ -374,8 +361,7 @@ class GameView(arcade.View):
             if self.player_cell:
                 r, c, l = self.player_cell.row, self.player_cell.column, self.player_cell.level
                 self.cells_visited.add((r, c, l))
-                if (r, c, l) == self.end_pos:
-                    self.game_won, self.solve_duration = True, time.time() - self.start_time; return
+                if (r, c, l) == self.end_pos: self.game_won, self.solve_duration = True, time.time() - self.start_time; return
                 if self.show_trace and (not self.path_history or (self.player_sprite.center_x-self.path_history[-1][0][0])**2 + (self.player_sprite.center_y-self.path_history[-1][0][1])**2 > 25):
                     self.path_history.append(((self.player_sprite.center_x, self.player_sprite.center_y), self.current_level))
                 self.current_stair_options = []
@@ -404,11 +390,8 @@ class GameView(arcade.View):
                 mag = math.sqrt(dx_n*dx_n + dy_n*dy_n)
                 if mag == 0: continue
                 score = (dx_n/mag * dx_key) + (dy_n/mag * dy_key)
-                if score > 0.4 and score > best_score:
-                    best_score, best_n = score, n
-            if best_n:
-                self.player_cell = best_n
-                self.target_pos = self.renderer.get_pixel(best_n.row, best_n.column)
+                if score > 0.4 and score > best_score: best_score, best_n = score, n
+            if best_n: self.player_cell, self.target_pos = best_n, self.renderer.get_pixel(best_n.row, best_n.column)
         elif key in [arcade.key.U, arcade.key.D]:
             td = "U" if key == arcade.key.U else "D"
             for lv, ds in self.current_stair_options:
@@ -423,13 +406,11 @@ class GameView(arcade.View):
                         self.update_hud(); break
         elif key == arcade.key.S:
             self.show_solution = not self.show_solution
-            if self.show_solution:
-                self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
+            if self.show_solution: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
         elif key == arcade.key.TAB:
             self.current_solver_idx = (self.current_solver_idx + 1) % len(self.solvers); self.update_hud()
             if self.show_solution: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
         elif key == arcade.key.P: arcade.get_image().save("maze_export.png")
         elif key == arcade.key.ESCAPE: self.window.show_view(MenuView())
 
-    def on_key_release(self, key, modifiers):
-        pass
+    def on_key_release(self, key, modifiers): pass
