@@ -41,6 +41,7 @@ class Grid:
         self.rows = rows
         self.columns = columns
         self.levels = levels
+        self.topology = "rect"
         self.grid = [[[Cell(r, c, l) for c in range(columns)] for r in range(rows)] for l in range(levels)]
         self._configure_cells()
         
@@ -75,8 +76,9 @@ class Grid:
                     nx, ny = self._get_normalized_coords(cell.row, cell.column)
                     keep = True
                     if shape == "circle":
-                        keep = (nx**2 + ny**2) <= 1.0
+                        keep = (nx**2 + ny**2) <= 1.05
                     elif shape == "triangle":
+                        # Equilateral triangle bounds
                         keep = (ny > -0.6) and (ny < 1.732 * nx + 1.1) and (ny < -1.732 * nx + 1.1)
                     elif shape == "hexagon":
                         keep = max(abs(nx), abs(nx)*0.5 + abs(ny)*0.866) <= 0.95
@@ -107,6 +109,7 @@ class Grid:
 
 class SquareCellGrid(Grid):
     def _configure_cells(self):
+        self.topology = "rect"
         for level in self.grid:
             for row in level:
                 for cell in row:
@@ -120,6 +123,7 @@ class SquareCellGrid(Grid):
 
 class HexCellGrid(Grid):
     def _configure_cells(self):
+        self.topology = "hex"
         for level in self.grid:
             for row in level:
                 for cell in row:
@@ -135,16 +139,25 @@ class HexCellGrid(Grid):
                         if 0 <= l+dl < self.levels:
                             cell.neighbors.append(self.grid[l+dl][r][c])
 
+    def _get_normalized_coords(self, r, c):
+        x = math.sqrt(3) * (c + 0.5 * (r % 2))
+        y = 1.5 * r
+        max_y = 1.5 * (self.rows - 1)
+        max_x = math.sqrt(3) * (self.columns - 0.5)
+        return (x / max_x) * 2 - 1, (y / max_y) * 2 - 1
+
 class TriCellGrid(Grid):
     def _configure_cells(self):
+        self.topology = "tri"
         for level in self.grid:
             for row in level:
                 for cell in row:
                     r, c, l = cell.row, cell.column, cell.level
-                    # (r+c)%2 even -> Upright ^ (base down, links to Below r-1)
+                    # (r+c)%2 even -> Upright ^ (shared base BELOW r-1)
+                    # (r+c)%2 odd  -> Inverted v (shared base ABOVE r+1)
                     if (r + c) % 2 == 0:
                         deltas = [(0, -1), (0, 1), (-1, 0)]
-                    else: # Inverted v (base up, links to Above r+1)
+                    else:
                         deltas = [(0, -1), (0, 1), (1, 0)]
                     for dr, dc in deltas:
                         if 0 <= r+dr < self.rows and 0 <= c+dc < self.columns:
@@ -154,14 +167,13 @@ class TriCellGrid(Grid):
                             cell.neighbors.append(self.grid[l+dl][r][c])
 
     def _get_normalized_coords(self, r, c):
-        # Aspect ratio correction for equilateral triangles
-        # s=1, h=0.866. Total width ~ cols*0.5. Total height ~ rows*0.866.
         nx = (c / max(1, self.columns - 1)) * 2 - 1
-        ny = ((r / max(1, self.rows - 1)) * 2 - 1) * 1.732
+        ny = ((r / max(1, self.rows - 1)) * 2 - 1) * 1.15 # Aspect correction
         return nx, ny
 
 class PolarCellGrid(Grid):
     def _configure_cells(self):
+        self.topology = "polar"
         for level in self.grid:
             for row in level:
                 for cell in row:

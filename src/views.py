@@ -40,7 +40,6 @@ class MenuView(arcade.View):
         
         self.title_text = None
         self.option_texts = []
-        self.footer_texts = []
 
     def on_show_view(self):
         arcade.set_background_color(config.BG_COLOR)
@@ -76,8 +75,7 @@ class MenuView(arcade.View):
             self.clear()
             if self.title_text: self.title_text.draw()
             for text in self.option_texts: text.draw()
-        except Exception:
-            traceback.print_exc()
+        except Exception: traceback.print_exc()
 
     def on_key_press(self, key, modifiers):
         changed = True
@@ -97,7 +95,6 @@ class MenuView(arcade.View):
         elif key == arcade.key.ENTER: self.start_game(); changed = False
         elif key == arcade.key.ESCAPE: arcade.exit(); changed = False
         else: changed = False
-        
         if changed: self.update_options()
 
     def start_game(self):
@@ -159,7 +156,8 @@ class GameView(arcade.View):
         if self.grid_type == "hex":
             self.cell_radius = min((config.SCREEN_WIDTH-150)/((cols+1)*math.sqrt(3)), avail_h/(rows*1.5+1)) * 0.95
         elif self.grid_type == "tri":
-            self.cell_radius = min((config.SCREEN_WIDTH-150)/(cols*math.sqrt(3)/2 + 1), avail_h/(rows*1.5 + 1)) * 0.9
+            # h step is R. circumradius R. side s = R*sqrt(3).
+            self.cell_radius = min((config.SCREEN_WIDTH-150)/(cols*math.sqrt(3)/2 + 1), avail_h/(rows + 1.5)) * 0.9
         elif self.grid_type == "polar":
              self.cell_radius = min((config.SCREEN_WIDTH-100)/2, (avail_h)/2) / (rows + 3) / 1.5
         else:
@@ -180,7 +178,6 @@ class GameView(arcade.View):
                     self.grid_shapes.append(arcade.shape_list.create_rectangle_outline(cx, cy, R*2, R*2, (40, 40, 40), 1))
 
         self.setup_ui_text()
-        
         valid_cells = list(self.grid.each_cell())
         if valid_cells:
             if random_endpoints:
@@ -204,7 +201,7 @@ class GameView(arcade.View):
 
     def setup_ui_text(self):
         self.hud_text_1 = arcade.Text("", 20, config.SCREEN_HEIGHT - 35, config.TEXT_COLOR, font_size=14, bold=True)
-        self.hud_text_2 = arcade.Text("ARROWS: Move | S: Sol | TAB: AI | M: Architectural Map | P: Print | ESC: Menu", 20, config.SCREEN_HEIGHT - 60, config.WALL_COLOR, font_size=11)
+        self.hud_text_2 = arcade.Text("WASD/ARROWS: Move | S: Sol | TAB: AI | M: Map | P: Print | ESC: Menu", 20, config.SCREEN_HEIGHT - 60, config.WALL_COLOR, font_size=11)
         self.status_text = arcade.Text("GENERATING...", config.SCREEN_WIDTH/2, 30, config.TEXT_COLOR, font_size=16, anchor_x="center")
         self.stair_prompt = arcade.Text("", config.SCREEN_WIDTH/2, 30, arcade.color.CYAN, font_size=18, anchor_x="center", bold=True)
         self.update_hud()
@@ -216,25 +213,20 @@ class GameView(arcade.View):
     def get_pixel(self, r, c, scale=1.0, offset=(0,0)):
         R = self.cell_radius * scale
         ox, oy = config.SCREEN_WIDTH / 2 + offset[0], (config.SCREEN_HEIGHT - self.top_margin + self.bottom_margin) / 2 + offset[1]
-
         if self.grid_type == "hex":
             w, h = math.sqrt(3) * R, 1.5 * R
             start_x, start_y = ox - (self.grid.columns + 0.5) * w / 2, oy - ((self.grid.rows - 1) * h + 2 * R) / 2
             return start_x + c*w + (w/2 if r % 2 == 1 else 0) + w/2, start_y + r*h + R
-            
         elif self.grid_type == "tri":
-            s, h = R * math.sqrt(3), 1.5 * R
-            start_x, start_y = ox - self.grid.columns * (s/4), oy - (self.grid.rows * h) / 2
-            cx, cy = start_x + c * (s/2) + s/2, start_y + r * h + R
-            if (r + c) % 2 != 0: cy += R/2 # Inverted center shift
-            return cx, cy
-
+            s = R * math.sqrt(3)
+            # h step is R for bases to align correctly.
+            start_x, start_y = ox - self.grid.columns * (s/4) - s/4, oy - (self.grid.rows * R) / 2
+            return start_x + c * (s/2) + s/2, start_y + r * R + R/2
         elif self.grid_type == "polar":
             rw = R * 1.5
             radius = (rw * 2) + r * rw + rw/2
             angle = (c * (2 * math.pi / self.grid.columns)) - math.pi / 2
             return ox + radius * math.cos(angle), oy + radius * math.sin(angle)
-
         else: # rect
             s = R * 2
             start_x, start_y = ox - (self.grid.columns * s)/2, oy - (self.grid.rows * s)/2
@@ -271,10 +263,8 @@ class GameView(arcade.View):
                 elif self.grid_type == "tri":
                     p1, p2, p3 = self._get_tri_verts(r, c, cx, cy, R)
                     if (r + c) % 2 == 0: # Upright
-                        # Bottom Edge (P2-P3) shares with Below neighbor (r-1)
                         edges = [(p2, p3, (-1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
                     else: # Inverted
-                        # Top Edge (P2-P3) shares with Above neighbor (r+1)
                         edges = [(p2, p3, (1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
                     for v1, v2, (dr, dc) in edges:
                         n = self.grid.get_cell(r+dr, c+dc, l)
@@ -359,9 +349,9 @@ class GameView(arcade.View):
                             self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx+R*math.cos(a1), cy+R*math.sin(a1), cx+R*math.cos(a2), cy+R*math.sin(a2), config.WALL_COLOR, 1))
                 elif self.grid_type == "tri":
                     p1, p2, p3 = self._get_tri_verts(r, c, cx, cy, R)
-                    if (r + c) % 2 == 0: # Upright
+                    if (r + c) % 2 == 0:
                         edges = [(p2, p3, (-1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
-                    else: # Inverted
+                    else:
                         edges = [(p2, p3, (1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
                     for v1, v2, (dr, dc) in edges:
                         n = self.grid.get_cell(r+dr, c+dc, l)
@@ -372,7 +362,7 @@ class GameView(arcade.View):
                     ir, or_ = (rw * 2) + r * rw, (rw * 2) + (r + 1) * rw
                     step = 2 * math.pi / self.grid.columns
                     ts, te = c * step - math.pi/2, (c + 1) * step - math.pi/2
-                    ox, oy = config.SCREEN_WIDTH / 2 + off[0], (config.SCREEN_HEIGHT - self.top_margin + self.bottom_margin) / 2 + offset[1]
+                    ox, oy = config.SCREEN_WIDTH / 2 + off[0], (config.SCREEN_HEIGHT - self.top_margin + self.bottom_margin) / 2 + off[1]
                     n = self.grid.get_cell(r-1, c, l)
                     if r == 0 or (not n or not cell.is_linked(n)):
                          self.map_wall_shapes[l].append(arcade.shape_list.create_line(ox + ir*math.cos(ts), oy + ir*math.sin(ts), ox + ir*math.cos(te), oy + ir*math.sin(te), config.WALL_COLOR, 1))
@@ -469,22 +459,17 @@ class GameView(arcade.View):
                 try:
                     for _ in range(5): self.solution_path = next(self.sol_iterator)
                 except StopIteration: self.solving = False
-            
-            # Smooth movement interpolation
             if self.player_sprite and self.target_pos:
                 dx, dy = self.target_pos[0] - self.player_sprite.center_x, self.target_pos[1] - self.player_sprite.center_y
-                self.player_sprite.center_x += dx * 0.3
-                self.player_sprite.center_y += dy * 0.3
-                
+                self.player_sprite.center_x += dx * 0.4
+                self.player_sprite.center_y += dy * 0.4
             if self.player_cell:
                 r, c, l = self.player_cell.row, self.player_cell.column, self.player_cell.level
                 self.cells_visited.add((r, c, l))
                 if (r, c, l) == self.end_pos:
                     self.game_won, self.solve_duration = True, time.time() - self.start_time; return
-                
                 if self.show_trace and (not self.path_history or (self.player_sprite.center_x-self.path_history[-1][0][0])**2 + (self.player_sprite.center_y-self.path_history[-1][0][1])**2 > 25):
                     self.path_history.append(((self.player_sprite.center_x, self.player_sprite.center_y), self.current_level))
-                
                 self.current_stair_options = []
                 for link in self.player_cell.get_links():
                     if link.level > l: self.current_stair_options.append((link.level, "U"))
@@ -498,9 +483,8 @@ class GameView(arcade.View):
             return
         if key == arcade.key.M: self.show_map = not self.show_map; return
         if self.show_map: return
-        
-        # Logical direction mapping for any topology
-        dir_map = {arcade.key.UP: (0, 1), arcade.key.DOWN: (0, -1), arcade.key.LEFT: (-1, 0), arcade.key.RIGHT: (1, 0)}
+        dir_map = {arcade.key.UP: (0, 1), arcade.key.DOWN: (0, -1), arcade.key.LEFT: (-1, 0), arcade.key.RIGHT: (1, 0),
+                   arcade.key.W: (0, 1), arcade.key.S: (0, -1), arcade.key.A: (-1, 0), arcade.key.D: (1, 0)}
         if key in dir_map:
             dx_key, dy_key = dir_map[key]
             best_n, best_score = None, -1.0
@@ -511,14 +495,12 @@ class GameView(arcade.View):
                 dx_n, dy_n = nx - px, ny - py
                 mag = math.sqrt(dx_n*dx_n + dy_n*dy_n)
                 if mag == 0: continue
-                # Dot product score for alignment with key direction
                 score = (dx_n/mag * dx_key) + (dy_n/mag * dy_key)
                 if score > 0.4 and score > best_score:
                     best_score, best_n = score, n
             if best_n:
                 self.player_cell = best_n
                 self.target_pos = self.get_pixel(best_n.row, best_n.column)
-
         elif key in [arcade.key.U, arcade.key.D]:
             td = "U" if key == arcade.key.U else "D"
             for lv, ds in self.current_stair_options:
