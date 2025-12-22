@@ -22,8 +22,13 @@ class MazeRenderer:
             return start_x + c*w + (w/2 if r % 2 == 1 else 0) + w/2, start_y + r*h + R
         elif self.grid_type == "tri":
             s = R * math.sqrt(3)
-            start_x, start_y = ox - self.grid.columns * (s/4) - s/4, oy - (self.grid.rows * R) / 2
-            return start_x + c * (s/2) + s/2, start_y + r * R + R/2
+            # Row height is 1.5R. Centroids alternate between 0.5R and R from the row base.
+            grid_w = (self.grid.columns + 1) * (s/2)
+            grid_h = self.grid.rows * 1.5 * R
+            start_x, start_y = ox - grid_w/2, oy - grid_h/2
+            cx = start_x + (c + 1) * (s/2)
+            cy = start_y + r * 1.5 * R + (0.5 * R if (r + c) % 2 == 0 else R)
+            return cx, cy
         elif self.grid_type == "polar":
             rw = R * 1.5
             radius = (rw * 2) + r * rw + rw/2
@@ -66,6 +71,8 @@ class MazeRenderer:
                         self._add_to_list(shapes, (cx+R*math.cos(a1), cy+R*math.sin(a1)), (cx+R*math.cos(a2), cy+R*math.sin(a2)), processed)
             elif self.grid_type == "tri":
                 p1, p2, p3 = self.get_tri_verts(r, c, cx, cy, R)
+                # Upright (even sum) shares base with neighbor below (r-1).
+                # Inverted (odd sum) shares base with neighbor above (r+1).
                 if (r + c) % 2 == 0:
                     edges = [(p2, p3, (-1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
                 else:

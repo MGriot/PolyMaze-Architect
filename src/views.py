@@ -214,7 +214,12 @@ class GameView(arcade.View):
             sr, sc, sl = self.start_pos
             self.player_cell = self.grid.get_cell(sr, sc, sl)
             px, py = self.renderer.get_pixel(sr, sc)
-            self.player_sprite = arcade.SpriteCircle(int(self.renderer.cell_radius * 0.3), config.PLAYER_COLOR)
+            
+            # Procedural circle sprite
+            rad = int(self.renderer.cell_radius * 0.3)
+            self.player_sprite = arcade.Sprite(
+                arcade.make_circle_texture(rad * 2, config.PLAYER_COLOR)
+            )
             self.player_sprite.center_x, self.player_sprite.center_y = px, py
             self.target_pos = (px, py)
             self.path_history = [((px, py), sl)]
