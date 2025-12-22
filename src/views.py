@@ -156,55 +156,44 @@ class GameView(arcade.View):
         self.cells_visited = set()
         
         avail_h = config.SCREEN_HEIGHT - self.top_margin - self.bottom_margin
-        # Adjust radius based on type
         if self.grid_type == "hex":
             self.cell_radius = min((config.SCREEN_WIDTH-150)/((cols+1)*math.sqrt(3)), avail_h/(rows*1.5+1)) * 0.95
         elif self.grid_type == "tri":
-            self.cell_radius = min((config.SCREEN_WIDTH-150)/((cols+1)*0.6), avail_h/(rows*math.sqrt(3))) * 0.9
+            self.cell_radius = min((config.SCREEN_WIDTH-150)/(cols*math.sqrt(3)/2 + 1), avail_h/(rows*1.5 + 1)) * 0.9
         elif self.grid_type == "polar":
-             # Radius acts as ring width
-             self.cell_radius = min((config.SCREEN_WIDTH-100)/2, (avail_h)/2) / (rows + 1) / 1.5
+             self.cell_radius = min((config.SCREEN_WIDTH-100)/2, (avail_h)/2) / (rows + 3) / 1.5
         else:
             self.cell_radius = min((config.SCREEN_WIDTH-150)/(cols+2), avail_h/(rows+2)) / 2
         
         self.grid_shapes = arcade.shape_list.ShapeElementList()
         R = self.cell_radius
-        
-        # Background Grid Shapes
-        for r in range(self.grid.rows):
-            for c in range(self.grid.columns):
-                cx, cy = self.get_pixel(r, c)
+        for cell in self.grid.each_cell():
+            if cell.level == 0:
+                cx, cy = self.get_pixel(cell.row, cell.column)
                 if self.grid_type == "hex":
                     pts = [(cx + R*math.cos(math.radians(a)), cy + R*math.sin(math.radians(a))) for a in [30, 90, 150, 210, 270, 330]]
                     self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (40, 40, 40), 1))
                 elif self.grid_type == "tri":
-                     # Point up or down?
-                     # r+c even -> upright (base down), r+c odd -> inverted (base up)
-                     direction = 1 if (r + c) % 2 == 0 else -1
-                     # Approximate triangle
-                     pts = [
-                         (cx, cy - direction * R), # Tip
-                         (cx - R * math.sqrt(3)/2, cy + direction * R/2),
-                         (cx + R * math.sqrt(3)/2, cy + direction * R/2)
-                     ]
-                     self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (40, 40, 40), 1))
-                elif self.grid_type == "polar":
-                     # Draw arc? Too complex for simple shapes list, skip background grid for polar or draw circles
-                     if c == 0: arcade.draw_circle_outline(config.SCREEN_WIDTH/2, (config.SCREEN_HEIGHT - self.top_margin + self.bottom_margin)/2, (r+0.5)*R*1.5, (40,40,40))
-                else:
+                    pts = self._get_tri_verts(cell.row, cell.column, cx, cy, R)
+                    self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (40, 40, 40), 1))
+                elif self.grid_type == "rect":
                     self.grid_shapes.append(arcade.shape_list.create_rectangle_outline(cx, cy, R*2, R*2, (40, 40, 40), 1))
 
         self.setup_ui_text()
         
-        # Random Endpoints Logic
-        self.start_pos = (0, 0, 0)
-        self.end_pos = (self.grid.rows-1, self.grid.columns-1, self.grid.levels-1)
-        if random_endpoints:
-            self.start_pos = (random.randint(0, self.grid.rows-1), random.randint(0, self.grid.columns-1), 0)
-            self.end_pos = (random.randint(0, self.grid.rows-1), random.randint(0, self.grid.columns-1), self.grid.levels-1)
-            # Ensure not same
-            while self.start_pos == self.end_pos and self.grid.size() > 1:
-                 self.end_pos = (random.randint(0, self.grid.rows-1), random.randint(0, self.grid.columns-1), self.grid.levels-1)
+        valid_cells = list(self.grid.each_cell())
+        if valid_cells:
+            if random_endpoints:
+                s_cell, e_cell = random.sample(valid_cells, 2) if len(valid_cells) > 1 else (valid_cells[0], valid_cells[0])
+                self.start_pos = (s_cell.row, s_cell.column, s_cell.level)
+                self.end_pos = (e_cell.row, e_cell.column, e_cell.level)
+            else:
+                valid_cells.sort(key=lambda c: (c.level, c.row, c.column))
+                s_cell, e_cell = valid_cells[0], valid_cells[-1]
+                self.start_pos = (s_cell.row, s_cell.column, s_cell.level)
+                self.end_pos = (e_cell.row, e_cell.column, e_cell.level)
+        else:
+            self.start_pos, self.end_pos = (0,0,0), (0,0,0)
 
         if animate:
             self.generating, self.gen_iterator = True, generator.generate_step(self.grid)
@@ -226,38 +215,37 @@ class GameView(arcade.View):
 
     def get_pixel(self, r, c, scale=1.0, offset=(0,0)):
         R = self.cell_radius * scale
-        ox = config.SCREEN_WIDTH / 2 + offset[0]
-        oy = (config.SCREEN_HEIGHT - self.top_margin + self.bottom_margin) / 2 + offset[1]
+        ox, oy = config.SCREEN_WIDTH / 2 + offset[0], (config.SCREEN_HEIGHT - self.top_margin + self.bottom_margin) / 2 + offset[1]
 
         if self.grid_type == "hex":
             w, h = math.sqrt(3) * R, 1.5 * R
-            grid_w = (self.grid.columns + 0.5) * w
-            grid_h = (self.grid.rows-1) * h + 2*R
-            start_x, start_y = ox - grid_w/2, oy - grid_h/2
+            start_x, start_y = ox - (self.grid.columns + 0.5) * w / 2, oy - ((self.grid.rows - 1) * h + 2 * R) / 2
             return start_x + c*w + (w/2 if r % 2 == 1 else 0) + w/2, start_y + r*h + R
             
         elif self.grid_type == "tri":
-            h = R * math.sqrt(3)
-            w = R 
-            grid_w = (self.grid.columns + 1) * w / 2
-            grid_h = self.grid.rows * h
-            start_x, start_y = ox - grid_w/2, oy - grid_h/2
-            cx = start_x + c * w / 2 + w/2
-            cy = start_y + r * h + h/2
+            s, h = R * math.sqrt(3), 1.5 * R
+            start_x, start_y = ox - self.grid.columns * (s/4), oy - (self.grid.rows * h) / 2
+            cx, cy = start_x + c * (s/2), start_y + r * h + R
+            if (r + c) % 2 != 0: cy += R/2 # Inverted center shift
             return cx, cy
 
         elif self.grid_type == "polar":
-            ring_width = R * 1.5
-            radius = (r + 0.5) * ring_width
-            angle_step = 2 * math.pi / self.grid.columns
-            angle = c * angle_step - math.pi / 2
+            rw = R * 1.5
+            radius = (rw * 2) + r * rw + rw/2
+            angle = (c * (2 * math.pi / self.grid.columns)) - math.pi / 2
             return ox + radius * math.cos(angle), oy + radius * math.sin(angle)
 
         else: # rect
             s = R * 2
-            grid_w, grid_h = self.grid.columns * s, self.grid.rows * s
-            start_x, start_y = ox - grid_w/2, oy - grid_h/2
+            start_x, start_y = ox - (self.grid.columns * s)/2, oy - (self.grid.rows * s)/2
             return start_x + c*s + R, start_y + r*s + R
+
+    def _get_tri_verts(self, r, c, cx, cy, R):
+        s = R * math.sqrt(3)
+        if (r + c) % 2 == 0: # Upright ^
+            return (cx, cy + R), (cx + s/2, cy - R/2), (cx - s/2, cy - R/2)
+        else: # Inverted v
+            return (cx, cy - R), (cx + s/2, cy + R/2), (cx - s/2, cy + R/2)
 
     def generate_walls(self):
         self.wall_list_layers = [arcade.SpriteList(use_spatial_hash=True) for _ in range(self.grid.levels)]
@@ -266,133 +254,51 @@ class GameView(arcade.View):
         
         for l in range(self.grid.levels):
             processed = set()
-            for r in range(self.grid.rows):
-                for c in range(self.grid.columns):
-                    cell = self.grid.get_cell(r, c, l)
-                    if not cell: continue
-                    cx, cy = self.get_pixel(r, c)
-                    
-                    if self.grid_type == "rect":
-                        deltas = [(1, 0, -R, R, R, R), (0, -1, -R, -R, -R, R), (-1, 0, -R, -R, R, -R), (0, 1, R, -R, R, R)]
-                        for dr, dc, x1, y1, x2, y2 in deltas:
-                            n = self.grid.get_cell(r+dr, c+dc, l)
-                            if not n or not cell.is_linked(n): self.add_wall((cx+x1, cy+y1), (cx+x2, cy+y2), processed, l)
+            for cell in self.grid.each_cell():
+                if cell.level != l: continue
+                r, c = cell.row, cell.column
+                cx, cy = self.get_pixel(r, c)
+                
+                if self.grid_type == "rect":
+                    deltas = [(1, 0, -R, R, R, R), (0, -1, -R, -R, -R, R), (-1, 0, -R, -R, R, -R), (0, 1, R, -R, R, R)]
+                    for dr, dc, x1, y1, x2, y2 in deltas:
+                        n = self.grid.get_cell(r+dr, c+dc, l)
+                        if not n or not cell.is_linked(n): self.add_wall((cx+x1, cy+y1), (cx+x2, cy+y2), processed, l)
                             
-                    elif self.grid_type == "hex":
-                        angles, deltas = [30, 90, 150, 210, 270, 330], ([(1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (0, 1)] if r % 2 == 0 else [(1, 1), (1, 0), (0, -1), (-1, 0), (-1, 1), (0, 1)])
-                        for i, (dr, dc) in enumerate(deltas):
-                            n = self.grid.get_cell(r+dr, c+dc, l)
-                            if not n or not cell.is_linked(n):
-                                a1, a2 = math.radians(angles[i]), math.radians(angles[(i+1)%6])
-                                self.add_wall((cx+R*math.cos(a1), cy+R*math.sin(a1)), (cx+R*math.cos(a2), cy+R*math.sin(a2)), processed, l)
-                                
-                    elif self.grid_type == "tri":
-                         # Direction: even sum -> upright, odd sum -> inverted
-                         upright = (r + c) % 2 == 0
-                         # Approx corners relative to center
-                         # Upright: Top(0, -R), BL(-w/2, R/2), BR(w/2, R/2) (visual coords inverted)
-                         # Wait, get_pixel returns center.
-                         # Visual: Y grows UP in math, but arcade 0,0 is bottom left.
-                         # Upright Triangle (base on bottom): Top Point, Bottom Left, Bottom Right
-                         # Inverted Triangle: Bottom Point, Top Left, Top Right
-                         
-                         # For tri grid, simple wall drawing is tricky because neighbors share edges explicitly.
-                         # Better: Iterate neighbors. If not linked, draw shared edge.
-                         
-                         # Upright(r,c): Neighbors are Bottom(r+1,c), Left(r,c-1), Right(r,c+1) (if exist)
-                         # Inverted(r,c): Neighbors are Top(r-1,c), Left, Right
-                         
-                         # Vertices relative to Center (cx, cy)
-                         # Upright: V1(0, R), V2(w/2, -R/2), V3(-w/2, -R/2) -> Top, BR, BL
-                         # Inverted: V1(0, -R), V2(-w/2, R/2), V3(w/2, R/2) -> Bot, TL, TR
-                         
-                         # Simpler: hardcode edges for direction
-                         side = R # approx
-                         h_half = R * math.sqrt(3) / 2
-                         
-                         if upright:
-                             # Neighbors: Bottom (r+1, c), Right (r, c+1), Left (r, c-1)
-                             # Edges: Bottom Edge, Right Slope, Left Slope
-                             
-                             # Bottom Neighbor check
-                             n = self.grid.get_cell(r+1, c, l)
-                             if not n or not cell.is_linked(n):
-                                 self.add_wall((cx - R*math.sqrt(3)/2, cy - R/2), (cx + R*math.sqrt(3)/2, cy - R/2), processed, l)
-                                 
-                             # Right Neighbor (c+1) - shared edge is Right Slope
-                             n = self.grid.get_cell(r, c+1, l)
-                             if not n or not cell.is_linked(n):
-                                 self.add_wall((cx + R*math.sqrt(3)/2, cy - R/2), (cx, cy + R), processed, l)
-                                 
-                             # Left Neighbor (c-1) - shared edge is Left Slope
-                             n = self.grid.get_cell(r, c-1, l)
-                             if not n or not cell.is_linked(n):
-                                 self.add_wall((cx - R*math.sqrt(3)/2, cy - R/2), (cx, cy + R), processed, l)
-                                 
-                         else: # Inverted
-                             # Neighbors: Top (r-1, c), Right, Left
-                             
-                             # Top Neighbor
-                             n = self.grid.get_cell(r-1, c, l)
-                             if not n or not cell.is_linked(n):
-                                 self.add_wall((cx - R*math.sqrt(3)/2, cy + R/2), (cx + R*math.sqrt(3)/2, cy + R/2), processed, l)
-                             
-                             # Right Neighbor
-                             n = self.grid.get_cell(r, c+1, l)
-                             if not n or not cell.is_linked(n):
-                                 self.add_wall((cx + R*math.sqrt(3)/2, cy + R/2), (cx, cy - R), processed, l)
-                                 
-                             # Left Neighbor
-                             n = self.grid.get_cell(r, c-1, l)
-                             if not n or not cell.is_linked(n):
-                                 self.add_wall((cx - R*math.sqrt(3)/2, cy + R/2), (cx, cy - R), processed, l)
-                    
-                    elif self.grid_type == "polar":
-                        # Ring Width = R * 1.5
-                        rw = R * 1.5
-                        inner_r = r * rw
-                        outer_r = (r + 1) * rw
-                        theta_step = 2 * math.pi / self.grid.columns
-                        theta_start = c * theta_step - math.pi/2
-                        theta_end = (c + 1) * theta_step - math.pi/2
-                        ox, oy = config.SCREEN_WIDTH / 2, (config.SCREEN_HEIGHT - self.top_margin + self.bottom_margin) / 2
-                        
-                        # Inward Wall (if r=0, always draw? No, center is open or closed? usually open center in polar maze)
-                        if r == 0:
-                             # Draw tiny circle? or nothing
-                             pass
-                        else:
-                             n = self.grid.get_cell(r-1, c, l)
-                             if not n or not cell.is_linked(n):
-                                 # Arc
-                                 p1 = (ox + inner_r * math.cos(theta_start), oy + inner_r * math.sin(theta_start))
-                                 p2 = (ox + inner_r * math.cos(theta_end), oy + inner_r * math.sin(theta_end))
-                                 # Linear approx for arc for now
-                                 self.add_wall(p1, p2, processed, l)
-
-                        # Outward Wall
-                        if r == self.grid.rows - 1:
-                             # Outer boundary
-                             p1 = (ox + outer_r * math.cos(theta_start), oy + outer_r * math.sin(theta_start))
-                             p2 = (ox + outer_r * math.cos(theta_end), oy + outer_r * math.sin(theta_end))
-                             self.add_wall(p1, p2, processed, l)
-                        else:
-                             n = self.grid.get_cell(r+1, c, l)
-                             if not n or not cell.is_linked(n):
-                                 p1 = (ox + outer_r * math.cos(theta_start), oy + outer_r * math.sin(theta_start))
-                                 p2 = (ox + outer_r * math.cos(theta_end), oy + outer_r * math.sin(theta_end))
-                                 self.add_wall(p1, p2, processed, l)
-                                 
-                        # CCW Wall (Left)
-                        n = self.grid.get_cell(r, (c-1)%self.grid.columns, l)
+                elif self.grid_type == "hex":
+                    angles, deltas = [30, 90, 150, 210, 270, 330], ([(1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (0, 1)] if r % 2 == 0 else [(1, 1), (1, 0), (0, -1), (-1, 0), (-1, 1), (0, 1)])
+                    for i, (dr, dc) in enumerate(deltas):
+                        n = self.grid.get_cell(r+dr, c+dc, l)
                         if not n or not cell.is_linked(n):
-                            p1 = (ox + inner_r * math.cos(theta_start), oy + inner_r * math.sin(theta_start))
-                            p2 = (ox + outer_r * math.cos(theta_start), oy + outer_r * math.sin(theta_start))
-                            self.add_wall(p1, p2, processed, l)
-                        
-                        # CW Wall (Right) - Handled by neighbor's CCW usually, but for boundary:
-                        # Actually standard wall logic handles one side. 
-                        pass
+                            a1, a2 = math.radians(angles[i]), math.radians(angles[(i+1)%6])
+                            self.add_wall((cx+R*math.cos(a1), cy+R*math.sin(a1)), (cx+R*math.cos(a2), cy+R*math.sin(a2)), processed, l)
+                                
+                elif self.grid_type == "tri":
+                    p1, p2, p3 = self._get_tri_verts(r, c, cx, cy, R)
+                    if (r + c) % 2 == 0: # Upright
+                        edges = [(p2, p3, (1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
+                    else: # Inverted
+                        edges = [(p2, p3, (-1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
+                    for v1, v2, (dr, dc) in edges:
+                        n = self.grid.get_cell(r+dr, c+dc, l)
+                        if not n or not cell.is_linked(n): self.add_wall(v1, v2, processed, l)
+                    
+                elif self.grid_type == "polar":
+                    rw = R * 1.5
+                    ir, or_ = (rw * 2) + r * rw, (rw * 2) + (r + 1) * rw
+                    step = 2 * math.pi / self.grid.columns
+                    ts, te = c * step - math.pi/2, (c + 1) * step - math.pi/2
+                    ox, oy = config.SCREEN_WIDTH / 2, (config.SCREEN_HEIGHT - self.top_margin + self.bottom_margin) / 2
+                    
+                    n = self.grid.get_cell(r-1, c, l)
+                    if r == 0 or (not n or not cell.is_linked(n)):
+                         self.add_wall((ox + ir*math.cos(ts), oy + ir*math.sin(ts)), (ox + ir*math.cos(te), oy + ir*math.sin(te)), processed, l)
+                    n = self.grid.get_cell(r+1, c, l)
+                    if not n or not cell.is_linked(n):
+                         self.add_wall((ox + or_*math.cos(ts), oy + or_*math.sin(ts)), (ox + or_*math.cos(te), oy + or_*math.sin(te)), processed, l)
+                    n = self.grid.get_cell(r, (c-1)%self.grid.columns, l)
+                    if not n or not cell.is_linked(n):
+                         self.add_wall((ox + ir*math.cos(ts), oy + ir*math.sin(ts)), (ox + or_*math.cos(ts), oy + or_*math.sin(ts)), processed, l)
 
     def finish_generation(self):
         try:
@@ -416,7 +322,7 @@ class GameView(arcade.View):
         except Exception: traceback.print_exc()
 
     def add_wall(self, p1, p2, processed, level):
-        wid = tuple(sorted([(round(p1[0],1), round(p1[1],1)), (round(p2[0],1), round(p2[1],1))]))
+        wid = tuple(sorted([(round(p1[0],2), round(p1[1],2)), (round(p2[0],2), round(p2[1],2))]))
         if wid in processed: return
         processed.add(wid)
         mx, my = (p1[0]+p2[0])/2, (p1[1]+p2[1])/2
@@ -450,98 +356,62 @@ class GameView(arcade.View):
 
         for l in range(self.grid.levels):
             off = (0, (l - (self.grid.levels-1)/2) * v_gap)
-            for r in range(self.grid.rows):
-                for c in range(self.grid.columns):
-                    cell = self.grid.get_cell(r, c, l)
-                    if not cell: continue
-                    cx, cy = self.get_pixel(r, c, m_scale, off)
-                    R = self.cell_radius * m_scale
-                    
-                    if self.grid_type == "rect":
-                        deltas = [(1, 0, -R, R, R, R), (0, -1, -R, -R, -R, R), (-1, 0, -R, -R, R, -R), (0, 1, R, -R, R, R)]
-                        for dr, dc, x1, y1, x2, y2 in deltas:
-                            neighbor = self.grid.get_cell(r+dr, c+dc, l)
-                            if not neighbor or not cell.is_linked(neighbor):
-                                self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx+x1, cy+y1, cx+x2, cy+y2, config.WALL_COLOR, 1))
-                                
-                    elif self.grid_type == "hex":
-                        angles, deltas = [30, 90, 150, 210, 270, 330], ([(1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (0, 1)] if r % 2 == 0 else [(1, 1), (1, 0), (0, -1), (-1, 0), (-1, 1), (0, 1)])
-                        for i, (dr, dc) in enumerate(deltas):
-                            neighbor = self.grid.get_cell(r+dr, c+dc, l)
-                            if not neighbor or not cell.is_linked(neighbor):
-                                a1, a2 = math.radians(angles[i]), math.radians(angles[(i+1)%6])
-                                self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx+R*math.cos(a1), cy+R*math.sin(a1), cx+R*math.cos(a2), cy+R*math.sin(a2), config.WALL_COLOR, 1))
+            for cell in self.grid.each_cell():
+                if cell.level != l: continue
+                r, c = cell.row, cell.column
+                cx, cy = self.get_pixel(r, c, m_scale, off)
+                R = self.cell_radius * m_scale
+                
+                if self.grid_type == "rect":
+                    deltas = [(1, 0, -R, R, R, R), (0, -1, -R, -R, -R, R), (-1, 0, -R, -R, R, -R), (0, 1, R, -R, R, R)]
+                    for dr, dc, x1, y1, x2, y2 in deltas:
+                        neighbor = self.grid.get_cell(r+dr, c+dc, l)
+                        if not neighbor or not cell.is_linked(neighbor):
+                            self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx+x1, cy+y1, cx+x2, cy+y2, config.WALL_COLOR, 1))
+                            
+                elif self.grid_type == "hex":
+                    angles, deltas = [30, 90, 150, 210, 270, 330], ([(1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (0, 1)] if r % 2 == 0 else [(1, 1), (1, 0), (0, -1), (-1, 0), (-1, 1), (0, 1)])
+                    for i, (dr, dc) in enumerate(deltas):
+                        neighbor = self.grid.get_cell(r+dr, c+dc, l)
+                        if not neighbor or not cell.is_linked(neighbor):
+                            a1, a2 = math.radians(angles[i]), math.radians(angles[(i+1)%6])
+                            self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx+R*math.cos(a1), cy+R*math.sin(a1), cx+R*math.cos(a2), cy+R*math.sin(a2), config.WALL_COLOR, 1))
 
-                    elif self.grid_type == "tri":
-                         upright = (r + c) % 2 == 0
-                         # Same logic as generate_walls but drawing lines directly
-                         if upright:
-                             # Bottom
-                             n = self.grid.get_cell(r+1, c, l)
-                             if not n or not cell.is_linked(n):
-                                 self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx - R*math.sqrt(3)/2, cy - R/2, cx + R*math.sqrt(3)/2, cy - R/2, config.WALL_COLOR, 1))
-                             # Right
-                             n = self.grid.get_cell(r, c+1, l)
-                             if not n or not cell.is_linked(n):
-                                 self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx + R*math.sqrt(3)/2, cy - R/2, cx, cy + R, config.WALL_COLOR, 1))
-                             # Left
-                             n = self.grid.get_cell(r, c-1, l)
-                             if not n or not cell.is_linked(n):
-                                 self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx - R*math.sqrt(3)/2, cy - R/2, cx, cy + R, config.WALL_COLOR, 1))
-                         else:
-                             # Top
-                             n = self.grid.get_cell(r-1, c, l)
-                             if not n or not cell.is_linked(n):
-                                 self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx - R*math.sqrt(3)/2, cy + R/2, cx + R*math.sqrt(3)/2, cy + R/2, config.WALL_COLOR, 1))
-                             # Right
-                             n = self.grid.get_cell(r, c+1, l)
-                             if not n or not cell.is_linked(n):
-                                 self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx + R*math.sqrt(3)/2, cy + R/2, cx, cy - R, config.WALL_COLOR, 1))
-                             # Left
-                             n = self.grid.get_cell(r, c-1, l)
-                             if not n or not cell.is_linked(n):
-                                 self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx - R*math.sqrt(3)/2, cy + R/2, cx, cy - R, config.WALL_COLOR, 1))
-
-                    elif self.grid_type == "polar":
-                        rw = R * 1.5
-                        inner_r, outer_r = r * rw, (r + 1) * rw
-                        theta_step = 2 * math.pi / self.grid.columns
-                        theta_start, theta_end = c * theta_step - math.pi/2, (c + 1) * theta_step - math.pi/2
-                        ox, oy = self.get_pixel(0,0, m_scale, off) # Center is same for all cells in polar map view
-                        # Re-calc center for polar map since get_pixel returns cell center
-                        # Actually get_pixel for polar returns cell center. 
-                        # We need the grid center relative to the map offset.
-                        # get_pixel(0,0) returns a point on the first ring. 
-                        # We can derive the center from that or just calculate it fresh.
-                        ox = config.SCREEN_WIDTH / 2 + off[0]
-                        oy = (config.SCREEN_HEIGHT - self.top_margin + self.bottom_margin) / 2 + off[1]
-                        
-                        # Inward
-                        if r > 0:
-                             n = self.grid.get_cell(r-1, c, l)
-                             if not n or not cell.is_linked(n):
-                                 p1 = (ox + inner_r * math.cos(theta_start), oy + inner_r * math.sin(theta_start))
-                                 p2 = (ox + inner_r * math.cos(theta_end), oy + inner_r * math.sin(theta_end))
-                                 self.map_wall_shapes[l].append(arcade.shape_list.create_line(p1[0], p1[1], p2[0], p2[1], config.WALL_COLOR, 1))
-                        # Outward
-                        if r == self.grid.rows - 1:
-                             p1 = (ox + outer_r * math.cos(theta_start), oy + outer_r * math.sin(theta_start))
-                             p2 = (ox + outer_r * math.cos(theta_end), oy + outer_r * math.sin(theta_end))
-                             self.map_wall_shapes[l].append(arcade.shape_list.create_line(p1[0], p1[1], p2[0], p2[1], config.WALL_COLOR, 1))
-                        else:
-                             n = self.grid.get_cell(r+1, c, l)
-                             if not n or not cell.is_linked(n):
-                                 p1 = (ox + outer_r * math.cos(theta_start), oy + outer_r * math.sin(theta_start))
-                                 p2 = (ox + outer_r * math.cos(theta_end), oy + outer_r * math.sin(theta_end))
-                                 self.map_wall_shapes[l].append(arcade.shape_list.create_line(p1[0], p1[1], p2[0], p2[1], config.WALL_COLOR, 1))
-                        # CCW
-                        n = self.grid.get_cell(r, (c-1)%self.grid.columns, l)
+                elif self.grid_type == "tri":
+                    p1, p2, p3 = self._get_tri_verts(r, c, cx, cy, R)
+                    if (r + c) % 2 == 0: # Upright
+                        edges = [(p2, p3, (1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
+                    else: # Inverted
+                        edges = [(p2, p3, (-1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
+                    for v1, v2, (dr, dc) in edges:
+                        n = self.grid.get_cell(r+dr, c+dc, l)
                         if not n or not cell.is_linked(n):
-                            p1 = (ox + inner_r * math.cos(theta_start), oy + inner_r * math.sin(theta_start))
-                            p2 = (ox + outer_r * math.cos(theta_start), oy + outer_r * math.sin(theta_start))
-                            self.map_wall_shapes[l].append(arcade.shape_list.create_line(p1[0], p1[1], p2[0], p2[1], config.WALL_COLOR, 1))
+                            self.map_wall_shapes[l].append(arcade.shape_list.create_line(v1[0], v1[1], v2[0], v2[1], config.WALL_COLOR, 1))
 
-                    for link in cell.get_links():
+                elif self.grid_type == "polar":
+                    rw = R * 1.5
+                    # Note: R here is already scaled by m_scale because get_pixel uses it.
+                    # Wait, self.cell_radius is NOT scaled in generate_map_shapes local variables usually.
+                    # R = self.cell_radius * m_scale. This is correct.
+                    # But ir, or_ logic needs to match the polar radius logic.
+                    # Hole is 2 rings wide.
+                    ir, or_ = (rw * 2) + r * rw, (rw * 2) + (r + 1) * rw
+                    step = 2 * math.pi / self.grid.columns
+                    ts, te = c * step - math.pi/2, (c + 1) * step - math.pi/2
+                    # ox, oy for map
+                    ox, oy = config.SCREEN_WIDTH / 2 + off[0], (config.SCREEN_HEIGHT - self.top_margin + self.bottom_margin) / 2 + off[1]
+                    
+                    n = self.grid.get_cell(r-1, c, l)
+                    if r == 0 or (not n or not cell.is_linked(n)):
+                         self.map_wall_shapes[l].append(arcade.shape_list.create_line(ox + ir*math.cos(ts), oy + ir*math.sin(ts), ox + ir*math.cos(te), oy + ir*math.sin(te), config.WALL_COLOR, 1))
+                    n = self.grid.get_cell(r+1, c, l)
+                    if not n or not cell.is_linked(n):
+                         self.map_wall_shapes[l].append(arcade.shape_list.create_line(ox + or_*math.cos(ts), oy + or_*math.sin(ts), ox + or_*math.cos(te), oy + or_*math.sin(te), config.WALL_COLOR, 1))
+                    n = self.grid.get_cell(r, (c-1)%self.grid.columns, l)
+                    if not n or not cell.is_linked(n):
+                         self.map_wall_shapes[l].append(arcade.shape_list.create_line(ox + ir*math.cos(ts), oy + ir*math.sin(ts), ox + or_*math.cos(ts), oy + or_*math.sin(ts), config.WALL_COLOR, 1))
+
+                for link in cell.get_links():
                         if link.level != cell.level:
                             col = arcade.color.AZURE if link.level > cell.level else arcade.color.BROWN
                             self.map_stair_shapes[l].append(arcade.shape_list.create_rectangle_filled(cx, cy, 4, 4, col))
@@ -609,8 +479,8 @@ class GameView(arcade.View):
             if self.show_trace and len(self.path_history) > 1:
                 pts = [p for p, l in self.path_history if l == self.current_level]
                 if len(pts) > 1: arcade.draw_line_strip(pts, config.PATH_TRACE_COLOR, 2)
-            if self.current_level == self.grid.levels - 1:
-                gx, gy = self.get_pixel(self.grid.rows-1, self.grid.columns-1)
+            if self.current_level == self.end_pos[2]:
+                gx, gy = self.get_pixel(self.end_pos[0], self.end_pos[1])
                 arcade.draw_circle_filled(gx, gy, self.cell_radius * 0.4, config.GOAL_COLOR)
             if self.player_sprite: arcade.draw_circle_filled(self.player_sprite.center_x, self.player_sprite.center_y, self.player_sprite.width/2, config.PLAYER_COLOR)
             self.hud_text_1.draw(); self.hud_text_2.draw(); self.draw_minimap()
@@ -635,7 +505,7 @@ class GameView(arcade.View):
                 px, py = self.player_sprite.center_x, self.player_sprite.center_y
                 r, c = self.get_grid_pos(px, py)
                 self.cells_visited.add((r, c, self.current_level))
-                if self.current_level == self.grid.levels - 1 and r == self.grid.rows-1 and c == self.grid.columns-1:
+                if (r, c, self.current_level) == self.end_pos:
                     self.game_won, self.solve_duration = True, time.time() - self.start_time; return
                 cell = self.grid.get_cell(r, c, self.current_level)
                 if cell:
@@ -719,10 +589,10 @@ class GameView(arcade.View):
         elif key == arcade.key.S:
             self.show_solution = not self.show_solution
             if self.show_solution:
-                self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(0,0,0), self.grid.get_cell(self.grid.rows-1,self.grid.columns-1,self.grid.levels-1))
+                self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
         elif key == arcade.key.TAB:
             self.current_solver_idx = (self.current_solver_idx + 1) % len(self.solvers); self.update_hud()
-            if self.show_solution: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(0,0,0), self.grid.get_cell(self.grid.rows-1,self.grid.columns-1,self.grid.levels-1))
+            if self.show_solution: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
         elif key == arcade.key.P: arcade.get_image().save("maze_export.png")
         elif key == arcade.key.ESCAPE: self.window.show_view(MenuView())
 

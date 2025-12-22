@@ -14,8 +14,13 @@ class Cell:
         self.active: bool = True # For masking shapes
 
     def link(self, cell: 'Cell', bidi=True):
+        if not cell.active: return # Safety check
         self.links[cell] = True
         if bidi: cell.link(self, bidi=False)
+
+    @property
+    def active_neighbors(self) -> List['Cell']:
+        return [n for n in self.neighbors if n.active]
 
     def unlink(self, cell: 'Cell', bidi=True):
         if cell in self.links:
@@ -188,17 +193,26 @@ class TriCellGrid(Grid):
             for row in level:
                 for cell in row:
                     r, c, l = cell.row, cell.column, cell.level
-                    if c > 0: cell.neighbors.append(self.grid[l][r][c-1])
-                    if c < self.columns - 1: cell.neighbors.append(self.grid[l][r][c+1])
+                    # Parity (r+c)%2 determines orientation
+                    # even: Upright (^), odd: Inverted (v)
                     if (r + c) % 2 == 0:
-                        if r < self.rows - 1: cell.neighbors.append(self.grid[l][r+1][c])
+                        deltas = [(0, -1), (0, 1), (1, 0)] # L, R, B
                     else:
-                        if r > 0: cell.neighbors.append(self.grid[l][r-1][c])
+                        deltas = [(0, -1), (0, 1), (-1, 0)] # L, R, T
+                    
+                    for dr, dc in deltas:
+                        if 0 <= r+dr < self.rows and 0 <= c+dc < self.columns:
+                            cell.neighbors.append(self.grid[l][r+dr][c+dc])
                     for dl in [-1, 1]:
                         if 0 <= l+dl < self.levels:
                             cell.neighbors.append(self.grid[l+dl][r][c])
 
     def _get_normalized_coords(self, r, c):
+        # Precise scaling for equilateral triangles
+        # h = sqrt(3)/2 * s. We treat s=1.
+        nx = (c / max(1, self.columns - 1)) * 2 - 1
+        ny = (r / max(1, self.rows - 1)) * 2 - 1
+        return nx, ny
         # Tri coordinates
         # Width = 1, Height = sqrt(3).
         # x = c * 0.5, y = r * sqrt(3) roughly

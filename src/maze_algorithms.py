@@ -20,7 +20,7 @@ class RecursiveBacktracker(MazeGenerator):
         visited = {start}
         while stack:
             current = stack[-1]
-            unvisited_neighbors = [n for n in current.neighbors if not n.get_links()]
+            unvisited_neighbors = [n for n in current.active_neighbors if not n.get_links()]
             if not unvisited_neighbors: stack.pop()
             else:
                 neighbor = random.choice(unvisited_neighbors)
@@ -34,13 +34,13 @@ class RandomizedPrims(MazeGenerator):
         visited = {grid.random_cell()}
         frontier = []
         for v in visited:
-            for n in v.neighbors: frontier.append((v, n))
+            for n in v.active_neighbors: frontier.append((v, n))
         while frontier:
             prev, cell = frontier.pop(random.randrange(len(frontier)))
             if cell in visited: continue
             prev.link(cell)
             visited.add(cell)
-            for n in cell.neighbors:
+            for n in cell.active_neighbors:
                 if n not in visited: frontier.append((cell, n))
             yield prev, cell
 
@@ -49,7 +49,7 @@ class AldousBroder(MazeGenerator):
         cell = grid.random_cell()
         unvisited = grid.size() - 1
         while unvisited > 0:
-            neighbor = random.choice(cell.neighbors)
+            neighbor = random.choice(cell.active_neighbors)
             if not neighbor.get_links():
                 cell.link(neighbor)
                 unvisited -= 1
@@ -59,7 +59,7 @@ class AldousBroder(MazeGenerator):
 class BinaryTree(MazeGenerator):
     def generate_step(self, grid: Grid):
         for cell in grid.each_cell():
-            neighbors = [n for n in cell.neighbors if (n.level == cell.level and (n.row < cell.row or (n.row == cell.row and n.column > cell.column)))]
+            neighbors = [n for n in cell.active_neighbors if (n.level == cell.level and (n.row < cell.row or (n.row == cell.row and n.column > cell.column)))]
             if neighbors:
                 cell.link(random.choice(neighbors))
                 yield cell, None
@@ -76,7 +76,7 @@ class Wilsons(MazeGenerator):
             cell = random.choice(unvisited)
             path = [cell]
             while cell not in visited:
-                cell = random.choice(cell.neighbors)
+                cell = random.choice(cell.active_neighbors)
                 if cell in path: path = path[:path.index(cell)+1]
                 else: path.append(cell)
             for i in range(len(path)-1):
@@ -92,7 +92,7 @@ class Kruskals(MazeGenerator):
             parent[i] = find(parent[i]); return parent[i]
         edges = []
         for cell in grid.each_cell():
-            for n in cell.neighbors:
+            for n in cell.active_neighbors:
                 if id(cell) < id(n): edges.append((cell, n))
         random.shuffle(edges)
         for u, v in edges:
@@ -125,7 +125,7 @@ class HuntAndKill(MazeGenerator):
     def generate_step(self, grid: Grid):
         current = grid.random_cell()
         while current:
-            unvisited_neighbors = [n for n in current.neighbors if not n.get_links()]
+            unvisited_neighbors = [n for n in current.active_neighbors if not n.get_links()]
             if unvisited_neighbors:
                 neighbor = random.choice(unvisited_neighbors)
                 current.link(neighbor)
@@ -134,7 +134,7 @@ class HuntAndKill(MazeGenerator):
             else:
                 current = None
                 for cell in grid.each_cell():
-                    visited_neighbors = [n for n in cell.neighbors if n.get_links()]
+                    visited_neighbors = [n for n in cell.active_neighbors if n.get_links()]
                     if not cell.get_links() and visited_neighbors:
                         current = cell
                         neighbor = random.choice(visited_neighbors)
@@ -201,7 +201,7 @@ class Ellers(MazeGenerator):
 class RecursiveDivision(MazeGenerator):
     def generate_step(self, grid: Grid):
         for cell in grid.each_cell():
-            for n in cell.neighbors: cell.link(n)
+            for n in cell.active_neighbors: cell.link(n)
         def divide(r, c, h, w, l):
             if h <= 1 or w <= 1: return
             if random.choice([True, False]) if h != w else h > w:
