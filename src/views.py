@@ -119,9 +119,10 @@ class GameView(arcade.View):
         self.stair_shapes_layers = [] 
         self.grid_shapes = None 
         self.player_sprite = None
-        self.physics_engine = None
+        self.player_cell = None # Track cell instead of physics
+        self.target_pos = None # For smooth animation
         self.current_level = 0
-        self.is_hex = False
+        self.grid_type = "rect"
         self.braid_pct = 0.0
         self.path_history = [] 
         self.show_trace = True
@@ -224,8 +225,8 @@ class GameView(arcade.View):
             
         elif self.grid_type == "tri":
             s, h = R * math.sqrt(3), 1.5 * R
-            start_x, start_y = ox - self.grid.columns * (s/4), oy - (self.grid.rows * h) / 2
-            cx, cy = start_x + c * (s/2), start_y + r * h + R
+            start_x, start_y = ox - self.grid.columns * (s/4) - s/4, oy - (self.grid.rows * h) / 2
+            cx, cy = start_x + c * (s/2) + s/2, start_y + r * h + R
             if (r + c) % 2 != 0: cy += R/2 # Inverted center shift
             return cx, cy
 
@@ -242,29 +243,25 @@ class GameView(arcade.View):
 
     def _get_tri_verts(self, r, c, cx, cy, R):
         s = R * math.sqrt(3)
-        if (r + c) % 2 == 0: # Upright ^
+        if (r + c) % 2 == 0: # Upright
             return (cx, cy + R), (cx + s/2, cy - R/2), (cx - s/2, cy - R/2)
-        else: # Inverted v
+        else: # Inverted
             return (cx, cy - R), (cx + s/2, cy + R/2), (cx - s/2, cy + R/2)
 
     def generate_walls(self):
-        self.wall_list_layers = [arcade.SpriteList(use_spatial_hash=True) for _ in range(self.grid.levels)]
         self.wall_shapes_layers = [arcade.shape_list.ShapeElementList() for _ in range(self.grid.levels)]
         R = self.cell_radius
-        
         for l in range(self.grid.levels):
             processed = set()
             for cell in self.grid.each_cell():
                 if cell.level != l: continue
                 r, c = cell.row, cell.column
                 cx, cy = self.get_pixel(r, c)
-                
                 if self.grid_type == "rect":
                     deltas = [(1, 0, -R, R, R, R), (0, -1, -R, -R, -R, R), (-1, 0, -R, -R, R, -R), (0, 1, R, -R, R, R)]
                     for dr, dc, x1, y1, x2, y2 in deltas:
                         n = self.grid.get_cell(r+dr, c+dc, l)
                         if not n or not cell.is_linked(n): self.add_wall((cx+x1, cy+y1), (cx+x2, cy+y2), processed, l)
-                            
                 elif self.grid_type == "hex":
                     angles, deltas = [30, 90, 150, 210, 270, 330], ([(1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (0, 1)] if r % 2 == 0 else [(1, 1), (1, 0), (0, -1), (-1, 0), (-1, 1), (0, 1)])
                     for i, (dr, dc) in enumerate(deltas):
@@ -272,24 +269,21 @@ class GameView(arcade.View):
                         if not n or not cell.is_linked(n):
                             a1, a2 = math.radians(angles[i]), math.radians(angles[(i+1)%6])
                             self.add_wall((cx+R*math.cos(a1), cy+R*math.sin(a1)), (cx+R*math.cos(a2), cy+R*math.sin(a2)), processed, l)
-                                
                 elif self.grid_type == "tri":
                     p1, p2, p3 = self._get_tri_verts(r, c, cx, cy, R)
-                    if (r + c) % 2 == 0: # Upright
+                    if (r + c) % 2 == 0:
                         edges = [(p2, p3, (1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
-                    else: # Inverted
+                    else:
                         edges = [(p2, p3, (-1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
                     for v1, v2, (dr, dc) in edges:
                         n = self.grid.get_cell(r+dr, c+dc, l)
                         if not n or not cell.is_linked(n): self.add_wall(v1, v2, processed, l)
-                    
                 elif self.grid_type == "polar":
                     rw = R * 1.5
                     ir, or_ = (rw * 2) + r * rw, (rw * 2) + (r + 1) * rw
                     step = 2 * math.pi / self.grid.columns
                     ts, te = c * step - math.pi/2, (c + 1) * step - math.pi/2
                     ox, oy = config.SCREEN_WIDTH / 2, (config.SCREEN_HEIGHT - self.top_margin + self.bottom_margin) / 2
-                    
                     n = self.grid.get_cell(r-1, c, l)
                     if r == 0 or (not n or not cell.is_linked(n)):
                          self.add_wall((ox + ir*math.cos(ts), oy + ir*math.sin(ts)), (ox + ir*math.cos(te), oy + ir*math.sin(te)), processed, l)
@@ -307,14 +301,12 @@ class GameView(arcade.View):
             self.generate_walls()
             self.generate_stairs_visuals()
             self.generate_map_shapes()
-            
-            # Start/End setup
             sr, sc, sl = self.start_pos
+            self.player_cell = self.grid.get_cell(sr, sc, sl)
             px, py = self.get_pixel(sr, sc)
             self.player_sprite = arcade.SpriteCircle(int(self.cell_radius * 0.3), config.PLAYER_COLOR)
             self.player_sprite.center_x, self.player_sprite.center_y = px, py
-            self.physics_engine = arcade.PhysicsEngineSimple(self.player_sprite, self.wall_list_layers[sl])
-            
+            self.target_pos = (px, py)
             self.path_history = [((px, py), sl)]
             self.start_time = time.time()
             self.cells_visited.add((sr, sc, sl))
@@ -325,11 +317,6 @@ class GameView(arcade.View):
         wid = tuple(sorted([(round(p1[0],2), round(p1[1],2)), (round(p2[0],2), round(p2[1],2))]))
         if wid in processed: return
         processed.add(wid)
-        mx, my = (p1[0]+p2[0])/2, (p1[1]+p2[1])/2
-        l, ang = math.sqrt((p1[0]-p2[0])**2 + (p1[1]-p2[1])**2), math.degrees(math.atan2(p2[1]-p1[1], p2[0]-p1[0]))
-        wall = arcade.SpriteSolidColor(int(l+1), config.WALL_THICKNESS + 2, config.WALL_COLOR)
-        wall.center_x, wall.center_y, wall.angle = mx, my, ang
-        self.wall_list_layers[level].append(wall)
         self.wall_shapes_layers[level].append(arcade.shape_list.create_line(p1[0], p1[1], p2[0], p2[1], config.WALL_COLOR, config.WALL_THICKNESS))
 
     def generate_stairs_visuals(self):
@@ -456,18 +443,16 @@ class GameView(arcade.View):
             self.clear()
             if self.generating:
                 self.grid_shapes.draw()
-                for r in range(self.grid.rows):
-                    for c in range(self.grid.columns):
-                        cell = self.grid.get_cell(r, c, 0)
-                        if not cell: continue
-                        cx, cy = self.get_pixel(r, c)
-                        for link in cell.get_links():
-                            if link.level == 0:
-                                lx, ly = self.get_pixel(link.row, link.column)
-                                arcade.draw_line(cx, cy, lx, ly, config.GENERATION_COLOR, 2)
+                for cell in self.grid.each_cell():
+                    cx, cy = self.get_pixel(cell.row, cell.column)
+                    for link in cell.get_links():
+                        if link.level == cell.level:
+                            lx, ly = self.get_pixel(link.row, link.column)
+                            arcade.draw_line(cx, cy, lx, ly, config.GENERATION_COLOR, 2)
                 self.status_text.draw(); return
             if self.show_map: self.draw_map_overlay(); return
-            self.wall_shapes_layers[self.current_level].draw(); self.stair_shapes_layers[self.current_level].draw()
+            self.wall_shapes_layers[self.current_level].draw()
+            self.stair_shapes_layers[self.current_level].draw()
             if self.show_solution and self.solution_path:
                 pts = []
                 for r, c, l in self.solution_path:
@@ -500,24 +485,27 @@ class GameView(arcade.View):
                 try:
                     for _ in range(5): self.solution_path = next(self.sol_iterator)
                 except StopIteration: self.solving = False
-            if self.physics_engine and not self.show_map:
-                self.physics_engine.update()
-                px, py = self.player_sprite.center_x, self.player_sprite.center_y
-                r, c = self.get_grid_pos(px, py)
-                self.cells_visited.add((r, c, self.current_level))
-                if (r, c, self.current_level) == self.end_pos:
+            
+            # Smooth movement interpolation
+            if self.player_sprite and self.target_pos:
+                dx, dy = self.target_pos[0] - self.player_sprite.center_x, self.target_pos[1] - self.player_sprite.center_y
+                self.player_sprite.center_x += dx * 0.3
+                self.player_sprite.center_y += dy * 0.3
+                
+            if self.player_cell:
+                r, c, l = self.player_cell.row, self.player_cell.column, self.player_cell.level
+                self.cells_visited.add((r, c, l))
+                if (r, c, l) == self.end_pos:
                     self.game_won, self.solve_duration = True, time.time() - self.start_time; return
-                cell = self.grid.get_cell(r, c, self.current_level)
-                if cell:
-                    if self.show_trace and (not self.path_history or (px-self.path_history[-1][0][0])**2 + (py-self.path_history[-1][0][1])**2 > 25):
-                        self.path_history.append(((px, py), self.current_level))
-                    cx, cy = self.get_pixel(r, c)
-                    self.current_stair_options = []
-                    if (px - cx)**2 + (py - cy)**2 < 225:
-                        for link in cell.get_links():
-                            if link.level > cell.level: self.current_stair_options.append((link.level, "U"))
-                            elif link.level < cell.level: self.current_stair_options.append((link.level, "D"))
-                    self.stair_prompt.text = f"STAIRS: Press {' / '.join(['['+o[1]+']' for o in self.current_stair_options])} to move" if self.current_stair_options else ""
+                
+                if self.show_trace and (not self.path_history or (self.player_sprite.center_x-self.path_history[-1][0][0])**2 + (self.player_sprite.center_y-self.path_history[-1][0][1])**2 > 25):
+                    self.path_history.append(((self.player_sprite.center_x, self.player_sprite.center_y), self.current_level))
+                
+                self.current_stair_options = []
+                for link in self.player_cell.get_links():
+                    if link.level > l: self.current_stair_options.append((link.level, "U"))
+                    elif link.level < l: self.current_stair_options.append((link.level, "D"))
+                self.stair_prompt.text = f"STAIRS: Press {' / '.join(['['+o[1]+']' for o in self.current_stair_options])} to move" if self.current_stair_options else ""
         except Exception: traceback.print_exc()
 
     def get_grid_pos(self, x, y):
@@ -566,26 +554,44 @@ class GameView(arcade.View):
             return max(0, min(r, self.grid.rows-1)), max(0, min(c, self.grid.columns-1))
 
     def on_key_press(self, key, modifiers):
-        if self.generating: return
-        if self.game_won:
-            if key == arcade.key.ENTER: self.window.show_view(MenuView())
+        if self.generating or self.game_won:
+            if self.game_won and key == arcade.key.ENTER: self.window.show_view(MenuView())
             return
         if key == arcade.key.M: self.show_map = not self.show_map; return
         if self.show_map: return
-        s = config.MOVEMENT_SPEED
-        if key == arcade.key.UP: self.player_sprite.change_y = s
-        elif key == arcade.key.DOWN: self.player_sprite.change_y = -s
-        elif key == arcade.key.LEFT: self.player_sprite.change_x = -s
-        elif key == arcade.key.RIGHT: self.player_sprite.change_x = s
+        
+        # Logical direction mapping for any topology
+        dir_map = {arcade.key.UP: (0, 1), arcade.key.DOWN: (0, -1), arcade.key.LEFT: (-1, 0), arcade.key.RIGHT: (1, 0)}
+        if key in dir_map:
+            dx_key, dy_key = dir_map[key]
+            best_n, best_score = None, -1.0
+            px, py = self.get_pixel(self.player_cell.row, self.player_cell.column)
+            for n in self.player_cell.get_links():
+                if n.level != self.player_cell.level: continue
+                nx, ny = self.get_pixel(n.row, n.column)
+                dx_n, dy_n = nx - px, ny - py
+                mag = math.sqrt(dx_n*dx_n + dy_n*dy_n)
+                if mag == 0: continue
+                # Dot product score for alignment with key direction
+                score = (dx_n/mag * dx_key) + (dy_n/mag * dy_key)
+                if score > 0.5 and score > best_score:
+                    best_score, best_n = score, n
+            if best_n:
+                self.player_cell = best_n
+                self.target_pos = self.get_pixel(best_n.row, best_n.column)
+
         elif key in [arcade.key.U, arcade.key.D]:
             td = "U" if key == arcade.key.U else "D"
             for lv, ds in self.current_stair_options:
                 if ds == td:
                     self.current_level = lv
-                    r, c = self.get_grid_pos(self.player_sprite.center_x, self.player_sprite.center_y)
-                    self.player_sprite.center_x, self.player_sprite.center_y = self.get_pixel(r, c)
-                    self.physics_engine = arcade.PhysicsEngineSimple(self.player_sprite, self.wall_list_layers[self.current_level])
-                    self.update_hud(); break
+                    target = self.grid.get_cell(self.player_cell.row, self.player_cell.column, lv)
+                    if target and self.player_cell.is_linked(target):
+                        self.player_cell = target
+                        px, py = self.get_pixel(target.row, target.column)
+                        self.player_sprite.center_x, self.player_sprite.center_y = px, py
+                        self.target_pos = (px, py)
+                        self.update_hud(); break
         elif key == arcade.key.S:
             self.show_solution = not self.show_solution
             if self.show_solution:
@@ -597,5 +603,4 @@ class GameView(arcade.View):
         elif key == arcade.key.ESCAPE: self.window.show_view(MenuView())
 
     def on_key_release(self, key, modifiers):
-        if key in [arcade.key.UP, arcade.key.DOWN]: self.player_sprite.change_y = 0
-        if key in [arcade.key.LEFT, arcade.key.RIGHT]: self.player_sprite.change_x = 0
+        pass
