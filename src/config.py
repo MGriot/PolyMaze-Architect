@@ -22,8 +22,16 @@ THEMES_FILE = os.path.join(os.path.dirname(__file__), "themes.json")
 
 def load_all_themes():
     try:
+        if not os.path.exists(THEMES_FILE): return {}
         with open(THEMES_FILE, "r") as f:
-            return json.load(f)
+            data = json.load(f)
+            # Basic validation
+            valid_themes = {}
+            required_keys = ["BG_COLOR", "WALL_COLOR", "PLAYER_COLOR", "GOAL_COLOR"]
+            for name, colors in data.items():
+                if all(k in colors for k in required_keys):
+                    valid_themes[name] = colors
+            return valid_themes
     except Exception:
         return {}
 

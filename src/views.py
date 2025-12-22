@@ -171,13 +171,11 @@ class GameView(arcade.View):
         if valid_cells:
             if random_endpoints:
                 s_cell, e_cell = random.sample(valid_cells, 2) if len(valid_cells) > 1 else (valid_cells[0], valid_cells[0])
-                self.start_pos = (s_cell.row, s_cell.column, s_cell.level)
-                self.end_pos = (e_cell.row, e_cell.column, e_cell.level)
+                self.start_pos = (s_cell.row, s_cell.column, s_cell.level); self.end_pos = (e_cell.row, e_cell.column, e_cell.level)
             else:
                 valid_cells.sort(key=lambda c: (c.level, c.row, c.column))
                 s_cell, e_cell = valid_cells[0], valid_cells[-1]
-                self.start_pos = (s_cell.row, s_cell.column, s_cell.level)
-                self.end_pos = (e_cell.row, e_cell.column, e_cell.level)
+                self.start_pos = (s_cell.row, s_cell.column, s_cell.level); self.end_pos = (e_cell.row, e_cell.column, e_cell.level)
         else: self.start_pos, self.end_pos = (0,0,0), (0,0,0)
         if animate: self.generating, self.gen_iterator = True, generator.generate_step(self.grid)
         else:
@@ -201,7 +199,8 @@ class GameView(arcade.View):
             if self.braid_pct > 0: self.grid.braid(self.braid_pct)
             self.generating = False
             self.wall_shapes_layers = [self.renderer.create_wall_shapes(l) for l in range(self.grid.levels)]
-            self.generate_stairs_visuals(); self.generate_map_shapes()
+            self.stair_shapes_layers = [self.renderer.create_stair_shapes(l) for l in range(self.grid.levels)]
+            self.generate_map_shapes()
             sr, sc, sl = self.start_pos
             self.player_cell = self.grid.get_cell(sr, sc, sl)
             px, py = self.renderer.get_pixel(sr, sc)
@@ -215,16 +214,6 @@ class GameView(arcade.View):
             self.update_hud()
         except Exception: traceback.print_exc()
 
-    def generate_stairs_visuals(self):
-        self.stair_shapes_layers = [arcade.shape_list.ShapeElementList() for _ in range(self.grid.levels)]
-        for l in range(self.grid.levels):
-            for cell in self.grid.each_cell():
-                if cell.level != l: continue
-                cx, cy = self.renderer.get_pixel(cell.row, cell.column)
-                for link in cell.get_links():
-                    if link.level > cell.level: self.stair_shapes_layers[l].append(arcade.shape_list.create_polygon([(cx, cy+8), (cx-8, cy-6), (cx+8, cy-6)], arcade.color.AZURE))
-                    elif link.level < cell.level: self.stair_shapes_layers[l].append(arcade.shape_list.create_polygon([(cx, cy-8), (cx-8, cy+6), (cx+8, cy+6)], arcade.color.BROWN))
-
     def generate_map_shapes(self):
         self.map_wall_shapes = [arcade.shape_list.ShapeElementList() for _ in range(self.grid.levels)]
         self.map_stair_shapes = [arcade.shape_list.ShapeElementList() for _ in range(self.grid.levels)]
@@ -232,46 +221,8 @@ class GameView(arcade.View):
         if self.renderer.grid_type == "polar": m_scale = 0.25
         for l in range(self.grid.levels):
             off = (0, (l - (self.grid.levels-1)/2) * v_gap)
-            for cell in self.grid.each_cell():
-                if cell.level != l: continue
-                r, c = cell.row, cell.column
-                cx, cy = self.renderer.get_pixel(r, c, m_scale, off)
-                R = self.renderer.cell_radius * m_scale
-                if self.renderer.grid_type == "rect":
-                    deltas = [(1, 0, -R, R, R, R), (0, -1, -R, -R, -R, R), (-1, 0, -R, -R, R, -R), (0, 1, R, -R, R, R)]
-                    for dr, dc, x1, y1, x2, y2 in deltas:
-                        neighbor = self.grid.get_cell(r+dr, c+dc, l)
-                        if not neighbor or not cell.is_linked(neighbor): self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx+x1, cy+y1, cx+x2, cy+y2, config.WALL_COLOR, 1))
-                elif self.renderer.grid_type == "hex":
-                    angles, deltas = [30, 90, 150, 210, 270, 330], ([(1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (0, 1)] if r % 2 == 0 else [(1, 1), (1, 0), (0, -1), (-1, 0), (-1, 1), (0, 1)])
-                    for i, (dr, dc) in enumerate(deltas):
-                        neighbor = self.grid.get_cell(r+dr, c+dc, l)
-                        if not neighbor or not cell.is_linked(neighbor):
-                            a1, a2 = math.radians(angles[i]), math.radians(angles[(i+1)%6])
-                            self.map_wall_shapes[l].append(arcade.shape_list.create_line(cx+R*math.cos(a1), cy+R*math.sin(a1), cx+R*math.cos(a2), cy+R*math.sin(a2), config.WALL_COLOR, 1))
-                elif self.renderer.grid_type == "tri":
-                    p1, p2, p3 = self.renderer.get_tri_verts(r, c, cx, cy, R)
-                    if (r + c) % 2 == 0: edges = [(p2, p3, (-1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
-                    else: edges = [(p2, p3, (1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
-                    for v1, v2, (dr, dc) in edges:
-                        n = self.grid.get_cell(r+dr, c+dc, l)
-                        if not n or not cell.is_linked(n): self.map_wall_shapes[l].append(arcade.shape_list.create_line(v1[0], v1[1], v2[0], v2[1], config.WALL_COLOR, 1))
-                elif self.renderer.grid_type == "polar":
-                    rw = R * 1.5
-                    ir, or_ = (rw * 2) + r * rw, (rw * 2) + (r + 1) * rw
-                    step = 2 * math.pi / self.grid.columns
-                    ts, te = c * step - math.pi/2, (c + 1) * step - math.pi/2
-                    ox, oy = config.SCREEN_WIDTH / 2 + off[0], (config.SCREEN_HEIGHT - self.top_margin + self.bottom_margin) / 2 + off[1]
-                    n = self.grid.get_cell(r-1, c, l)
-                    if r == 0 or (not n or not cell.is_linked(n)): self.map_wall_shapes[l].append(arcade.shape_list.create_line(ox + ir*math.cos(ts), oy + ir*math.sin(ts), ox + ir*math.cos(te), oy + ir*math.sin(te), config.WALL_COLOR, 1))
-                    n = self.grid.get_cell(r+1, c, l)
-                    if not n or not cell.is_linked(n): self.map_wall_shapes[l].append(arcade.shape_list.create_line(ox + or_*math.cos(ts), oy + or_*math.sin(ts), ox + or_*math.cos(te), oy + or_*math.sin(te), config.WALL_COLOR, 1))
-                    n = self.grid.get_cell(r, (c-1)%self.grid.columns, l)
-                    if not n or not cell.is_linked(n): self.map_wall_shapes[l].append(arcade.shape_list.create_line(ox + ir*math.cos(ts), oy + ir*math.sin(ts), ox + or_*math.cos(ts), oy + or_*math.sin(ts), config.WALL_COLOR, 1))
-                for link in cell.get_links():
-                        if link.level != cell.level:
-                            col = arcade.color.AZURE if link.level > cell.level else arcade.color.BROWN
-                            self.map_stair_shapes[l].append(arcade.shape_list.create_rectangle_filled(cx, cy, 4, 4, col))
+            self.map_wall_shapes[l] = self.renderer.create_wall_shapes(l, scale=m_scale, offset=off, thickness_mult=0.5)
+            self.map_stair_shapes[l] = self.renderer.create_stair_shapes(l, scale=m_scale, offset=off)
 
     def draw_map_overlay(self):
         arcade.draw_lbwh_rectangle_filled(0, 0, config.SCREEN_WIDTH, config.SCREEN_HEIGHT, (0,0,0,235))
@@ -356,8 +307,7 @@ class GameView(arcade.View):
                 except StopIteration: self.solving = False
             if self.player_sprite and self.target_pos:
                 dx, dy = self.target_pos[0] - self.player_sprite.center_x, self.target_pos[1] - self.player_sprite.center_y
-                self.player_sprite.center_x += dx * 0.4
-                self.player_sprite.center_y += dy * 0.4
+                self.player_sprite.center_x += dx * 0.4; self.player_sprite.center_y += dy * 0.4
             if self.player_cell:
                 r, c, l = self.player_cell.row, self.player_cell.column, self.player_cell.level
                 self.cells_visited.add((r, c, l))
@@ -402,11 +352,11 @@ class GameView(arcade.View):
                         self.player_cell = target
                         px, py = self.renderer.get_pixel(target.row, target.column)
                         self.player_sprite.center_x, self.player_sprite.center_y = px, py
-                        self.target_pos = (px, py)
-                        self.update_hud(); break
+                        self.target_pos = (px, py); self.update_hud(); break
         elif key == arcade.key.S:
             self.show_solution = not self.show_solution
-            if self.show_solution: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
+            if self.show_solution:
+                self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
         elif key == arcade.key.TAB:
             self.current_solver_idx = (self.current_solver_idx + 1) % len(self.solvers); self.update_hud()
             if self.show_solution: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
