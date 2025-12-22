@@ -140,11 +140,12 @@ class HexCellGrid(Grid):
                             cell.neighbors.append(self.grid[l+dl][r][c])
 
     def _get_normalized_coords(self, r, c):
-        x = math.sqrt(3) * (c + 0.5 * (r % 2))
-        y = 1.5 * r
-        max_y = 1.5 * (self.rows - 1)
-        max_x = math.sqrt(3) * (self.columns - 0.5)
-        return (x / max_x) * 2 - 1, (y / max_y) * 2 - 1
+        # Hex visual width: (cols + 0.5) * sqrt(3)R
+        # Hex visual height: (rows-1)*1.5R + 2R
+        # We normalize based on these spatial offsets
+        nx = ((c + 0.5 * (r % 2)) / self.columns) * 2 - 1
+        ny = (r / self.rows) * 2 - 1
+        return nx, ny
 
 class TriCellGrid(Grid):
     def _configure_cells(self):
@@ -157,7 +158,7 @@ class TriCellGrid(Grid):
                     # (r+c)%2 odd  -> Inverted v (shared base ABOVE r+1)
                     if (r + c) % 2 == 0:
                         deltas = [(0, -1), (0, 1), (-1, 0)]
-                    else:
+                    else: # Inverted v (base up, links to Above r+1)
                         deltas = [(0, -1), (0, 1), (1, 0)]
                     for dr, dc in deltas:
                         if 0 <= r+dr < self.rows and 0 <= c+dc < self.columns:
@@ -167,8 +168,9 @@ class TriCellGrid(Grid):
                             cell.neighbors.append(self.grid[l+dl][r][c])
 
     def _get_normalized_coords(self, r, c):
-        nx = (c / max(1, self.columns - 1)) * 2 - 1
-        ny = ((r / max(1, self.rows - 1)) * 2 - 1) * 1.15 # Aspect correction
+        # Tri visual width: cols * s/2. Height: rows * R.
+        nx = (c / self.columns) * 2 - 1
+        ny = (r / self.rows) * 2 - 1
         return nx, ny
 
 class PolarCellGrid(Grid):
