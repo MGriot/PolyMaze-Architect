@@ -22,11 +22,12 @@ class MazeRenderer:
             return start_x + c*w + (w/2 if r % 2 == 1 else 0) + w/2, start_y + r*h + R
         elif self.grid_type == "tri":
             s = R * math.sqrt(3)
+            # Row height is 1.5R for equilateral interlocking.
             grid_w = (self.grid.columns + 1) * (s/2)
-            grid_h = self.grid.rows * R + 0.5 * R
+            grid_h = self.grid.rows * 1.5 * R
             start_x, start_y = ox - grid_w/2, oy - grid_h/2
             cx = start_x + (c + 1) * (s/2)
-            cy = start_y + r * R + (0.5 * R if (r + c) % 2 == 0 else R)
+            cy = start_y + r * 1.5 * R + (0.5 * R if (r + c) % 2 == 0 else R)
             return cx, cy
         elif self.grid_type == "polar":
             rw = R * 1.5
