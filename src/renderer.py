@@ -22,12 +22,12 @@ class MazeRenderer:
             return start_x + c*w + (w/2 if r % 2 == 1 else 0) + w/2, start_y + r*h + R
         elif self.grid_type == "tri":
             s = R * math.sqrt(3)
-            # Row height is 1.5R. Centroids alternate between 0.5R and R from the row base.
+            # Row height is R for shared bases.
             grid_w = (self.grid.columns + 1) * (s/2)
-            grid_h = self.grid.rows * 1.5 * R
+            grid_h = self.grid.rows * R + 0.5 * R
             start_x, start_y = ox - grid_w/2, oy - grid_h/2
             cx = start_x + (c + 1) * (s/2)
-            cy = start_y + r * 1.5 * R + (0.5 * R if (r + c) % 2 == 0 else R)
+            cy = start_y + r * R + (0.5 * R if (r + c) % 2 == 0 else R)
             return cx, cy
         elif self.grid_type == "polar":
             rw = R * 1.5
@@ -50,12 +50,10 @@ class MazeRenderer:
         shapes = arcade.shape_list.ShapeElementList()
         processed = set()
         R = self.cell_radius
-        
         for cell in self.grid.each_cell():
             if cell.level != level: continue
             r, c = cell.row, cell.column
             cx, cy = self.get_pixel(r, c)
-            
             if self.grid_type == "rect":
                 deltas = [(1, 0, -R, R, R, R), (0, -1, -R, -R, -R, R), (-1, 0, -R, -R, R, -R), (0, 1, R, -R, R, R)]
                 for dr, dc, x1, y1, x2, y2 in deltas:
@@ -71,8 +69,6 @@ class MazeRenderer:
                         self._add_to_list(shapes, (cx+R*math.cos(a1), cy+R*math.sin(a1)), (cx+R*math.cos(a2), cy+R*math.sin(a2)), processed)
             elif self.grid_type == "tri":
                 p1, p2, p3 = self.get_tri_verts(r, c, cx, cy, R)
-                # Upright (even sum) shares base with neighbor below (r-1).
-                # Inverted (odd sum) shares base with neighbor above (r+1).
                 if (r + c) % 2 == 0:
                     edges = [(p2, p3, (-1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
                 else:
@@ -87,7 +83,6 @@ class MazeRenderer:
                 step = 2 * math.pi / self.grid.columns
                 ts, te = c * step - math.pi/2, (c + 1) * step - math.pi/2
                 ox, oy = config.SCREEN_WIDTH / 2, (config.SCREEN_HEIGHT - self.top_margin + self.bottom_margin) / 2
-                
                 n_in = self.grid.get_cell(r-1, c, level)
                 if r == 0 or (not n_in or not cell.is_linked(n_in)):
                     self._add_to_list(shapes, (ox + ir*math.cos(ts), oy + ir*math.sin(ts)), (ox + ir*math.cos(te), oy + ir*math.sin(te)), processed)

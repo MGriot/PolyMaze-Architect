@@ -14,6 +14,7 @@ class Cell:
 
     def link(self, cell: 'Cell', bidi=True):
         if not self.active or not cell.active: return
+        if cell in self.links: return
         self.links[cell] = True
         if bidi: cell.link(self, bidi=False)
 
@@ -55,12 +56,12 @@ class Grid:
         return None
 
     def random_cell(self) -> Optional[Cell]:
-        active_cells = [c for c in self.each_cell()]
+        active_cells = list(self.each_cell())
         if not active_cells: return None
         return random.choice(active_cells)
 
     def size(self) -> int:
-        return len([c for c in self.each_cell()])
+        return len(list(self.each_cell()))
 
     def each_cell(self) -> Iterator[Cell]:
         for level in self.grid:
@@ -76,12 +77,11 @@ class Grid:
                     nx, ny = self._get_normalized_coords(cell.row, cell.column)
                     keep = True
                     if shape == "circle":
-                        keep = (nx**2 + ny**2) <= 1.05
+                        keep = (nx**2 + ny**2) <= 1.1 # Buffer for edges
                     elif shape == "triangle":
-                        # Equilateral triangle bounds
-                        keep = (ny > -0.6) and (ny < 1.732 * nx + 1.1) and (ny < -1.732 * nx + 1.1)
+                        keep = (ny > -0.7) and (ny < 1.732 * nx + 1.2) and (ny < -1.732 * nx + 1.2)
                     elif shape == "hexagon":
-                        keep = max(abs(nx), abs(nx)*0.5 + abs(ny)*0.866) <= 0.95
+                        keep = max(abs(nx), abs(nx)*0.5 + abs(ny)*0.866) <= 0.98
                     
                     if not keep:
                         cell.active = False
@@ -140,9 +140,6 @@ class HexCellGrid(Grid):
                             cell.neighbors.append(self.grid[l+dl][r][c])
 
     def _get_normalized_coords(self, r, c):
-        # Hex visual width: (cols + 0.5) * sqrt(3)R
-        # Hex visual height: (rows-1)*1.5R + 2R
-        # We normalize based on these spatial offsets
         nx = ((c + 0.5 * (r % 2)) / self.columns) * 2 - 1
         ny = (r / self.rows) * 2 - 1
         return nx, ny
@@ -154,11 +151,9 @@ class TriCellGrid(Grid):
             for row in level:
                 for cell in row:
                     r, c, l = cell.row, cell.column, cell.level
-                    # (r+c)%2 even -> Upright ^ (shared base BELOW r-1)
-                    # (r+c)%2 odd  -> Inverted v (shared base ABOVE r+1)
                     if (r + c) % 2 == 0:
                         deltas = [(0, -1), (0, 1), (-1, 0)]
-                    else: # Inverted v (base up, links to Above r+1)
+                    else:
                         deltas = [(0, -1), (0, 1), (1, 0)]
                     for dr, dc in deltas:
                         if 0 <= r+dr < self.rows and 0 <= c+dc < self.columns:
@@ -168,7 +163,6 @@ class TriCellGrid(Grid):
                             cell.neighbors.append(self.grid[l+dl][r][c])
 
     def _get_normalized_coords(self, r, c):
-        # Tri visual width: cols * s/2. Height: rows * R.
         nx = (c / self.columns) * 2 - 1
         ny = (r / self.rows) * 2 - 1
         return nx, ny
