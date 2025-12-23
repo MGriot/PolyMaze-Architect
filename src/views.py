@@ -152,15 +152,26 @@ class GameView(arcade.View):
                 else: pts = [(cx-rad, cy-rad), (cx+rad, cy-rad), (cx+rad, cy+rad), (cx-rad, cy+rad)]
                 self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (60, 60, 60), 1))
         
-        self.setup_ui_text(); valid_cells = list(self.grid.each_cell())
+        valid_cells = list(self.grid.each_cell())
         if valid_cells:
             if random_endpoints:
-                s_c = random.choice(valid_cells); e_c = random.choice(valid_cells)
-                self.start_pos = (s_c.row, s_c.column, 0); self.end_pos = (e_c.row, e_c.column, levels-1)
+                s_c = random.choice(valid_cells)
+                e_c = random.choice(valid_cells)
+                if len(valid_cells) > 1:
+                    while e_c == s_c: e_c = random.choice(valid_cells)
+                self.start_pos = (s_c.row, s_c.column, s_c.level)
+                self.end_pos = (e_c.row, e_c.column, e_c.level)
             else:
                 valid_cells.sort(key=lambda c: (c.level, c.row, c.column))
-                self.start_pos = (valid_cells[0].row, valid_cells[0].column, 0); self.end_pos = (valid_cells[-1].row, valid_cells[-1].column, levels-1)
+                s_c, e_c = valid_cells[0], valid_cells[-1]
+                self.start_pos = (s_c.row, s_c.column, s_c.level)
+                self.end_pos = (e_c.row, e_c.column, e_c.level)
         
+        # Center camera on grid during generation
+        mid_r, mid_c = self.grid.rows // 2, self.grid.columns // 2
+        gx, gy = self.renderer.get_pixel(mid_r, mid_c)
+        self.maze_camera.position = (gx, gy)
+
         if animate: self.generating, self.gen_iterator = True, generator.generate_step(self.grid)
         else:
             generator.generate(self.grid)
