@@ -1,35 +1,34 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+## [v2.1.0] - 2025-12-23
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+### Added
+- **Dynamic Camera System**:
+    - Implemented a smooth following camera using `arcade.camera.Camera2D`.
+    - Added a separate `gui_camera` for fixed UI overlays.
+    - **Zoom Controls**: Use `+` and `-` to scale the view (0.1x to 3.0x).
+- **Professional HUD**:
+    - Added a semi-transparent HUD bar at the top of the screen.
+    - Added real-time **FPS** display.
+    - Added **Step Counter** to track player movement.
+    - Added **Time Tracking** to measure maze solve duration.
+- **Enhanced Movement**:
+    - Unified cell-based movement across all topologies using spatial dot-product alignment.
+
+### Fixed
+- Fixed critical `AttributeError` by updating camera implementation for Arcade 3.3.x.
+- Fixed `IndentationError` in the main rendering loop.
+- Fixed `NoneType` attribute errors during fast view transitions.
 
 ## [v2.0.0] - 2025-12-22
 
 ### Added
-- **New Maze Algorithms:**
-    - Added **Hunt and Kill** algorithm.
-    - Added **Eller's Algorithm** (row-by-row generation).
-- **New Grid Topologies:**
-    - **Triangular Grid**: Perfect equilateral tessellation.
-    - **Polar (Circular) Grid**: Concentric circles with center-hole padding for navigability.
-- **Features:**
-    - **Independent Shapes**: Decoupled "Cell Shape" from "Maze Form".
-    - **Masking System**: Apply any form (Circle, triangle, etc.) to any cell type.
-    - **Discrete Movement**: Snappy cell-based navigation using Arrow keys or **WASD**.
-    - **Solution Path**: Re-implemented solution toggle using the **'X'** key.
+- **Topologies**: Triangular and Polar (Circular) grid support.
+- **Geometric Masks**: Apply forms (Circle, Hexagon, etc.) to any grid.
+- **Algorithms**: Added Hunt & Kill and Eller's algorithms.
+- **Theme Engine**: JSON-based theme validation and light/dark mode support.
 
 ### Changed
-- **Architecture**:
-    - Extracted `MazeRenderer` class to handle all coordinate and wall-detection logic.
-    - Refactored `GameView` to use discrete state-based movement instead of velocity physics.
-- **Rendering**:
-    - Implemented high-precision coordinate rounding to eliminate duplicate lines.
-    - Updated generation phase to show accurate equilateral triangle/hex outlines.
-
-### Fixed
-- Fixed critical crash when drawing player sprites (`AttributeError`).
-- Fixed `TypeError` in Sprite initialization across different library versions.
-- Fixed logic gap where generation and solvers would ignore shape boundaries.
-- Fixed starting and ending points sometimes spawning outside the maze shape.
+- Refactored rendering logic into a standalone `MazeRenderer` class.
+- Replaced velocity physics with snappy state-based discrete movement.
+- Re-mapped solution toggle to the **'X'** key to avoid WASD conflicts.

@@ -120,12 +120,13 @@ class GameView(arcade.View):
         self.solvers: List[Tuple[MazeSolver, str, Tuple[int, int, int]]] = [(BFS_Solver(), "BFS", config.COLOR_SOL_BFS), (DFS_Solver(), "DFS", config.COLOR_SOL_DFS), (AStar_Solver(), "A*", config.COLOR_SOL_ASTAR)]
         self.solution_path: List[Tuple[int, int, int]] = []; self.show_solution: bool = False; self.solving: bool = False
         self.sol_iterator: Optional[Iterator] = None; self.gen_iterator: Optional[Iterator] = None; self.generating: bool = False
-        self.hud_text_1: Optional[arcade.Text] = None; self.hud_text_2: Optional[arcade.Text] = None; self.status_text: Optional[arcade.Text] = None; self.stair_prompt: Optional[arcade.Text] = None
+        self.hud_text_1: Optional[arcade.Text] = None; self.hud_text_2: Optional[arcade.Text] = None; self.hud_stats: Optional[arcade.Text] = None
+        self.status_text: Optional[arcade.Text] = None; self.stair_prompt: Optional[arcade.Text] = None
         self.current_stair_options: List[Tuple[int, str]] = []; self.top_margin: int = 80; self.bottom_margin: int = 60
         self.show_map: bool = False; self.map_wall_shapes: List[arcade.shape_list.ShapeElementList] = []; self.map_stair_shapes: List[arcade.shape_list.ShapeElementList] = []
         self.game_won: bool = False; self.cells_visited: set = set()
         self.start_pos: Tuple[int, int, int] = (0,0,0); self.end_pos: Tuple[int, int, int] = (0,0,0)
-        self.step_count: int = 0
+        self.step_count: int = 0; self.start_time: float = 0; self.solve_duration: float = 0
         
         # Cameras for Arcade 3.x
         self.maze_camera = arcade.camera.Camera2D()
@@ -153,20 +154,17 @@ class GameView(arcade.View):
                 else: pts = [(cx-rad, cy-rad), (cx+rad, cy-rad), (cx+rad, cy+rad), (cx-rad, cy+rad)]
                 self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (60, 60, 60), 1))
         
-        valid_cells = list(self.grid.each_cell())
+        self.setup_ui_text(); valid_cells = list(self.grid.each_cell())
         if valid_cells:
             if random_endpoints:
-                s_c = random.choice(valid_cells)
-                e_c = random.choice(valid_cells)
+                s_c = random.choice(valid_cells); e_c = random.choice(valid_cells)
                 if len(valid_cells) > 1:
                     while e_c == s_c: e_c = random.choice(valid_cells)
-                self.start_pos = (s_c.row, s_c.column, s_c.level)
-                self.end_pos = (e_c.row, e_c.column, e_c.level)
+                self.start_pos = (s_c.row, s_c.column, s_c.level); self.end_pos = (e_c.row, e_c.column, e_c.level)
             else:
                 valid_cells.sort(key=lambda c: (c.level, c.row, c.column))
                 s_c, e_c = valid_cells[0], valid_cells[-1]
-                self.start_pos = (s_c.row, s_c.column, s_c.level)
-                self.end_pos = (e_c.row, e_c.column, e_c.level)
+                self.start_pos = (s_c.row, s_c.column, s_c.level); self.end_pos = (e_c.row, e_c.column, e_c.level)
         
         # Center camera on grid during generation
         mid_r, mid_c = self.grid.rows // 2, self.grid.columns // 2
@@ -180,35 +178,32 @@ class GameView(arcade.View):
             self.finish_generation()
 
     def setup_ui_text(self):
-        self.hud_text_1 = arcade.Text("", 20, config.SCREEN_HEIGHT-35, config.TEXT_COLOR, font_size=14, bold=True)
-        self.hud_text_2 = arcade.Text("WASD: Move | X: Sol | +/-: Zoom | 0: Reset | M: Map | ESC: Menu", 20, config.SCREEN_HEIGHT-60, config.WALL_COLOR, font_size=11)
+        self.hud_text_1 = arcade.Text("", 20, config.SCREEN_HEIGHT - 25, config.TEXT_COLOR, font_size=12, bold=True)
+        self.hud_text_2 = arcade.Text("WASD: Move | X: Sol | R: Trace | +/-: Zoom | 0: Reset | M: Map | ESC: Menu", 20, config.SCREEN_HEIGHT - 65, config.WALL_COLOR, font_size=10)
+        self.hud_stats = arcade.Text("", config.SCREEN_WIDTH - 20, config.SCREEN_HEIGHT - 25, config.HIGHLIGHT_COLOR, font_size=12, anchor_x="right", bold=True)
         self.status_text = arcade.Text("GENERATING...", config.SCREEN_WIDTH/2, 30, config.TEXT_COLOR, font_size=16, anchor_x="center")
         self.stair_prompt = arcade.Text("", config.SCREEN_WIDTH/2, 30, arcade.color.CYAN, font_size=18, anchor_x="center", bold=True)
         self.update_hud()
 
     def update_hud(self):
         if not self.grid: return
-        l_str = f"FL {self.current_level+1}/{self.grid.levels}"
-        z_str = f"Z: {self.maze_camera.zoom:.1f}x"
+        l_str = f"Floor {self.current_level+1}/{self.grid.levels}"
+        z_str = f"Zoom: {self.maze_camera.zoom:.1f}x"
         t_spent = int(time.time() - self.start_time) if not self.game_won else int(self.solve_duration)
         fps = arcade.get_fps()
         
         if self.hud_text_1:
-            self.hud_text_1.text = f"{self.gen_name.upper()} | {l_str} | {z_str} | STEPS: {self.step_count} | TIME: {t_spent}s | FPS: {int(fps)}"
+            self.hud_text_1.text = f"{self.gen_name.upper()} ARCHITECT | {l_str}"
+        if self.hud_stats:
+            self.hud_stats.text = f"STEPS: {self.step_count} | TIME: {t_spent}s | {z_str} | FPS: {int(fps)}"
 
     def scroll_to_player(self, instant=False):
         if not self.player_sprite: return
-        # In Arcade 3.x, Camera2D position is the center of the viewport
-        if instant:
-            self.maze_camera.position = (self.player_sprite.center_x, self.player_sprite.center_y)
+        if instant: self.maze_camera.position = (self.player_sprite.center_x, self.player_sprite.center_y)
         else:
-            # Smooth interpolation
             curr_x, curr_y = self.maze_camera.position
             dest_x, dest_y = self.player_sprite.center_x, self.player_sprite.center_y
-            self.maze_camera.position = (
-                curr_x + (dest_x - curr_x) * 0.1,
-                curr_y + (dest_y - curr_y) * 0.1
-            )
+            self.maze_camera.position = (curr_x + (dest_x - curr_x) * 0.1, curr_y + (dest_y - curr_y) * 0.1)
 
     def finish_generation(self):
         try:
@@ -217,11 +212,9 @@ class GameView(arcade.View):
             self.stair_shapes_layers = [self.renderer.create_stair_shapes(l) for l in range(self.grid.levels)]; self.generate_map_shapes()
             sr, sc, sl = self.start_pos; self.player_cell = self.grid.get_cell(sr, sc, sl); px, py = self.renderer.get_pixel(sr, sc)
             rad = int(self.renderer.cell_radius * 0.3)
-            # Safe texture initialization for Sprite
-            self.player_sprite = arcade.Sprite()
-            self.player_sprite.texture = arcade.make_circle_texture(rad * 2, config.PLAYER_COLOR)
+            self.player_sprite = arcade.Sprite(); self.player_sprite.texture = arcade.make_circle_texture(rad * 2, config.PLAYER_COLOR)
             self.player_sprite.center_x, self.player_sprite.center_y = px, py; self.player_list.append(self.player_sprite)
-            self.target_pos, self.path_history, self.start_time, self.cells_visited = (px, py), [((px, py), sl)], time.time(), set([(sr, sc, sl)])
+            self.target_pos, self.path_history, self.start_time, self.cells_visited = (px, py), [((sr, sc), sl)], time.time(), set([(sr, sc, sl)])
             self.update_hud(); self.scroll_to_player(True)
         except Exception: traceback.print_exc()
 
@@ -236,6 +229,20 @@ class GameView(arcade.View):
             off = (0, (l-(self.grid.levels-1)/2)*config.SCREEN_HEIGHT*0.22); p_center = self.renderer.get_pixel(self.grid.rows//2, self.grid.columns//2, 0.35, off)
             arcade.draw_lbwh_rectangle_filled(p_center[0]-200, p_center[1]-150, 400, 300, (50, 50, 50, 100))
             self.map_wall_shapes[l].draw(); self.map_stair_shapes[l].draw()
+            
+            # Draw solution on map
+            if self.show_solution and self.solution_path:
+                pts = [self.renderer.get_pixel(r, c, 0.35, off) for r, c, lv in self.solution_path if lv == l]
+                if len(pts) > 1: arcade.draw_line_strip(pts, self.solvers[self.current_solver_idx][2], 2)
+            
+            # Draw trace on map
+            if self.show_trace and len(self.path_history) > 1:
+                pts = [self.renderer.get_pixel(r, c, 0.35, off) for (r, c), lv in self.path_history if lv == l]
+                if len(pts) > 1: arcade.draw_line_strip(pts, config.PATH_TRACE_COLOR, 1)
+
+            # Markers
+            if l == self.start_pos[2]: px, py = self.renderer.get_pixel(self.start_pos[0], self.start_pos[1], 0.35, off); arcade.draw_circle_filled(px, py, 4, arcade.color.WHITE)
+            if l == self.end_pos[2]: px, py = self.renderer.get_pixel(self.end_pos[0], self.end_pos[1], 0.35, off); arcade.draw_circle_filled(px, py, 4, config.GOAL_COLOR)
             if l == self.current_level and self.player_cell: px, py = self.renderer.get_pixel(self.player_cell.row, self.player_cell.column, 0.35, off); arcade.draw_circle_filled(px, py, 5, config.PLAYER_COLOR)
 
     def draw_minimap(self):
@@ -256,7 +263,6 @@ class GameView(arcade.View):
             self.clear()
             if self.show_map: self.gui_camera.use(); self.draw_map_overlay(); return
             
-            # Draw maze content through following camera
             self.maze_camera.use()
             if self.generating:
                 self.grid_shapes.draw()
@@ -271,16 +277,20 @@ class GameView(arcade.View):
                     pts = [self.renderer.get_pixel(r, c) for r, c, l in self.solution_path if l == self.current_level]
                     if len(pts) > 1: arcade.draw_line_strip(pts, self.solvers[self.current_solver_idx][2], 4)
                 if self.show_trace and len(self.path_history) > 1:
-                    pts = [p for p, l in self.path_history if l == self.current_level]
+                    pts = [self.renderer.get_pixel(r, c) for (r, c), l in self.path_history if l == self.current_level]
                     if len(pts) > 1: arcade.draw_line_strip(pts, config.PATH_TRACE_COLOR, 2)
                 if self.current_level == self.end_pos[2]: gx, gy = self.renderer.get_pixel(self.end_pos[0], self.end_pos[1]); arcade.draw_circle_filled(gx, gy, self.renderer.cell_radius*0.4, config.GOAL_COLOR)
                 self.player_list.draw()
             
-            # Draw UI through fixed camera
             self.gui_camera.use()
-            if self.generating: self.status_text.draw()
+            if self.generating:
+                if self.status_text: self.status_text.draw()
             else:
-                self.hud_text_1.draw(); self.hud_text_2.draw(); self.draw_minimap()
+                arcade.draw_lbwh_rectangle_filled(0, config.SCREEN_HEIGHT - 40, config.SCREEN_WIDTH, 40, (0, 0, 0, 180))
+                if self.hud_text_1: self.hud_text_1.draw()
+                if self.hud_stats: self.hud_stats.draw()
+                if self.hud_text_2: self.hud_text_2.draw()
+                self.draw_minimap()
                 if self.current_stair_options and self.stair_prompt: self.stair_prompt.draw()
                 if self.game_won: self.draw_victory()
         except Exception: traceback.print_exc()
@@ -305,7 +315,7 @@ class GameView(arcade.View):
             if self.player_cell:
                 r, c, l = self.player_cell.row, self.player_cell.column, self.player_cell.level; self.cells_visited.add((r, c, l))
                 if (r, c, l) == self.end_pos: self.game_won, self.solve_duration = True, time.time()-self.start_time; return
-                if self.show_trace and self.player_sprite and (not self.path_history or (self.player_sprite.center_x-self.path_history[-1][0][0])**2 + (self.player_sprite.center_y-self.path_history[-1][0][1])**2 > 25): self.path_history.append(((self.player_sprite.center_x, self.player_sprite.center_y), self.current_level))
+                if self.show_trace and (not self.path_history or self.path_history[-1][0] != (r, c) or self.path_history[-1][1] != l): self.path_history.append(((r, c), l))
                 self.current_stair_options = []
                 for link in self.player_cell.get_links():
                     if link.level > l: self.current_stair_options.append((link.level, "U"))
@@ -319,19 +329,21 @@ class GameView(arcade.View):
             if self.game_won and key == arcade.key.ENTER: self.window.show_view(MenuView())
             return
         if key == arcade.key.M: self.show_map = not self.show_map; return
+        
+        # Keys allowed in map mode
+        if key == arcade.key.X:
+            self.show_solution = not self.show_solution
+            if self.show_solution and self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
+            return
+        elif key == arcade.key.R:
+            self.show_trace = not self.show_trace; return
+
         if self.show_map: return
-
-        # Zoom Controls
-        if key in [arcade.key.EQUAL, arcade.key.PLUS]:
-            self.maze_camera.zoom = min(self.maze_camera.zoom + 0.1, 3.0)
-            self.update_hud()
-        elif key == arcade.key.MINUS:
-            self.maze_camera.zoom = max(self.maze_camera.zoom - 0.1, 0.1)
-            self.update_hud()
-        elif key in [arcade.key.KEY_0, arcade.key.NUM_0]:
-            self.maze_camera.zoom = 1.0
-            self.update_hud()
-
+        
+        if key in [arcade.key.EQUAL, arcade.key.PLUS]: self.maze_camera.zoom = min(self.maze_camera.zoom + 0.1, 3.0); self.update_hud()
+        elif key == arcade.key.MINUS: self.maze_camera.zoom = max(self.maze_camera.zoom - 0.1, 0.1); self.update_hud()
+        elif key in [arcade.key.KEY_0, arcade.key.NUM_0]: self.maze_camera.zoom = 1.0; self.update_hud()
+        
         dir_map = {arcade.key.UP: (0, 1), arcade.key.DOWN: (0, -1), arcade.key.LEFT: (-1, 0), arcade.key.RIGHT: (1, 0),
                    arcade.key.W: (0, 1), arcade.key.S: (0, -1), arcade.key.A: (-1, 0), arcade.key.D: (1, 0)}
         if key in dir_map:
@@ -344,22 +356,13 @@ class GameView(arcade.View):
                     if mag == 0: continue
                     score = (dx_n/mag * dx_key) + (dy_n/mag * dy_key)
                     if score > 0.4 and score > best_score: best_score, best_n = score, n
-                if best_n:
-                    self.player_cell, self.target_pos = best_n, self.renderer.get_pixel(best_n.row, best_n.column)
-                    self.step_count += 1
+                if best_n: self.player_cell, self.target_pos = best_n, self.renderer.get_pixel(best_n.row, best_n.column); self.step_count += 1
         elif key in [arcade.key.U, arcade.key.D]:
             td = "U" if key == arcade.key.U else "D"
             for lv, ds in self.current_stair_options:
                 if ds == td and self.player_cell:
                     self.current_level = lv; target = self.grid.get_cell(self.player_cell.row, self.player_cell.column, lv) if self.grid else None
-                    if target and self.player_cell.is_linked(target):
-                        self.player_cell = target; px, py = self.renderer.get_pixel(target.row, target.column)
-                        self.player_sprite.center_x, self.player_sprite.center_y = px, py; self.target_pos = (px, py)
-                        self.step_count += 1
-                        self.update_hud(); break
-        elif key == arcade.key.X:
-            self.show_solution = not self.show_solution
-            if self.show_solution and self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
+                    if target and self.player_cell.is_linked(target): self.player_cell = target; px, py = self.renderer.get_pixel(target.row, target.column); self.player_sprite.center_x, self.player_sprite.center_y = px, py; self.target_pos = (px, py); self.step_count += 1; self.update_hud(); break
         elif key == arcade.key.TAB:
             self.current_solver_idx = (self.current_solver_idx + 1) % len(self.solvers); self.update_hud()
             if self.show_solution and self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))

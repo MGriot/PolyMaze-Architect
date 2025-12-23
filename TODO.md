@@ -9,15 +9,19 @@
 *   [DONE] [src/maze_topology.py] Refactor architecture to support **Independent Cell Shapes and Maze Forms** (Masking).
 *   [DONE] [src/maze_algorithms.py] Update all generators to be **Mask-Aware** using `active_neighbors`.
 
+## Camera & UI (Priority: High)
+*   [DONE] [src/views.py] Implement **Following Camera** (`Camera2D`) for Arcade 3.3.3.
+*   [DONE] [src/views.py] Implement **Dynamic Zoom** system (+/- keys).
+*   [DONE] [src/views.py] Implement **Professional HUD Bar** with live metrics (FPS, Steps, Time).
+*   [DONE] [src/views.py] Separate **GUI Camera** from Game Camera.
+
 ## Testing (Priority: High)
-*   [DONE] [tests/] **Initialize Test Suite**. Created `tests/` directory.
+*   [DONE] [tests/] **Initialize Test Suite**.
 *   [DONE] [tests/test_topology.py] Added unit tests for `Cell` linking/unlinking and neighbor calculations.
 *   [DONE] [tests/test_algorithms.py] Added verification tests for new algorithms.
 
 ## Refactoring (Priority: Medium)
 *   [DONE] [src/views.py] **Robust Triangular Rendering**. Implemented equilateral tiling and vertex-based edge detection.
-*   [DONE] [src/views.py] **Enhanced Polar Layout**. Added center hole padding for improved navigability.
-*   [DONE] [src/views.py] **Fix Performance Warning**. Refactored `MenuView` to use `arcade.Text` objects.
 *   [DONE] [src/renderer.py] **Decompose GameView**. Extracted all rendering and coordinate logic into a dedicated class.
 *   [DONE] [src/config.py] Implement **Schema Validation** for `themes.json` loading.
 

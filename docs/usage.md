@@ -15,15 +15,24 @@ Navigate using the following keys:
 - **ENTER**: Begin Architecting.
 
 ## Exploration (In-Game)
-- **WASD / Arrow Keys**: Discrete, cell-based movement.
-- **U / D**: Move **Up** or **Down** levels when standing on a Stair (triangular markers).
+- **WASD / Arrow Keys**: Discrete, cell-based movement with spatial alignment.
+- **U / D**: Move **Up** or **Down** levels when standing on a Stair.
 - **X**: Toggle **AI Solution** animation.
+- **+/-**: **Zoom In / Out** (0.1x to 3.0x).
+- **0**: Reset Zoom to 1.0x.
 - **TAB**: Change the AI solver algorithm (BFS, DFS, A*).
-- **+/-**: **Zoom In / Out**.
-- **0**: Reset Zoom.
 - **M**: Toggle **Architectural Map** (Vertical exploded view).
-- **P**: **Print** (Save PNG export).
+- **P**: **Print** (Save current view as PNG).
 - **ESC**: Back to Menu.
+
+## The HUD (Heads-Up Display)
+The HUD bar at the top provides real-time information:
+- **Top Left**: Current generation algorithm and your floor location.
+- **Top Right**: 
+    - **STEPS**: Number of cells moved.
+    - **TIME**: Total time spent exploring the current maze.
+    - **ZOOM**: Current magnification level.
+    - **FPS**: Real-time rendering performance.
 
 ## Visual Indicators
 - **Azure Triangle**: Stair leading Up.
