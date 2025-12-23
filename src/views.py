@@ -203,7 +203,7 @@ class GameView(arcade.View):
         self.update_hud()
 
     def update_hud(self):
-        l_str = f"Floor {self.current_level+1}/{self.grid.levels}" if self.grid.levels > 1 else ""
+        l_str = f"Floor {self.current_level+1}/{self.grid.levels}" if self.grid and self.grid.levels > 1 else ""
         if self.hud_text_1: self.hud_text_1.text = f"{self.gen_name.upper()} ARCHITECT | {l_str}"
 
     def finish_generation(self):
@@ -217,7 +217,9 @@ class GameView(arcade.View):
             self.player_cell = self.grid.get_cell(sr, sc, sl)
             px, py = self.renderer.get_pixel(sr, sc)
             rad = int(self.renderer.cell_radius * 0.3)
-            self.player_sprite = arcade.Sprite(texture=arcade.make_circle_texture(rad * 2, config.PLAYER_COLOR))
+            # Safe texture initialization
+            circ_tex = arcade.make_circle_texture(rad * 2, config.PLAYER_COLOR)
+            self.player_sprite = arcade.Sprite(circ_tex)
             self.player_sprite.center_x, self.player_sprite.center_y = px, py
             self.player_list.append(self.player_sprite)
             self.target_pos = (px, py); self.path_history = [((px, py), sl)]
@@ -321,7 +323,7 @@ class GameView(arcade.View):
                 r, c, l = self.player_cell.row, self.player_cell.column, self.player_cell.level
                 self.cells_visited.add((r, c, l))
                 if (r, c, l) == self.end_pos: self.game_won, self.solve_duration = True, time.time() - self.start_time; return
-                if self.show_trace and (not self.path_history or (self.player_sprite.center_x-self.path_history[-1][0][0])**2 + (self.player_sprite.center_y-self.path_history[-1][0][1])**2 > 25):
+                if self.show_trace and self.player_sprite and (not self.path_history or (self.player_sprite.center_x-self.path_history[-1][0][0])**2 + (self.player_sprite.center_y-self.path_history[-1][0][1])**2 > 25):
                     self.path_history.append(((self.player_sprite.center_x, self.player_sprite.center_y), self.current_level))
                 self.current_stair_options = []
                 for link in self.player_cell.get_links():

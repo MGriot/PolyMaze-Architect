@@ -22,7 +22,7 @@ class MazeRenderer:
             return start_x + c*w + (w/2 if r % 2 == 1 else 0) + w/2, start_y + r*h + R
         elif self.grid_type == "tri":
             s = R * math.sqrt(3)
-            # Row height is 1.5R. Centroids alternate between 0.5R and R from the row base.
+            # Perfect equilateral step is 1.5R.
             grid_w = (self.grid.columns + 1) * (s/2)
             grid_h = self.grid.rows * 1.5 * R
             start_x, start_y = ox - grid_w/2, oy - grid_h/2
@@ -72,6 +72,8 @@ class MazeRenderer:
                         self._add_to_list(shapes, (cx+R*math.cos(a1), cy+R*math.sin(a1)), (cx+R*math.cos(a2), cy+R*math.sin(a2)), processed, thickness)
             elif self.grid_type == "tri":
                 p1, p2, p3 = self.get_tri_verts(r, c, cx, cy, R)
+                # Upright (even sum) shares base with neighbor below (r-1).
+                # Inverted (odd sum) shares base with neighbor above (r+1).
                 if (r + c) % 2 == 0:
                     edges = [(p2, p3, (-1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
                 else:
@@ -112,6 +114,7 @@ class MazeRenderer:
         return shapes
 
     def _add_to_list(self, shapes, p1, p2, processed, thickness):
+        # Precise rounding key prevents duplicate lines
         wid = tuple(sorted([(round(p1[0],2), round(p1[1],2)), (round(p2[0],2), round(p2[1],2))]))
         if wid in processed: return
         processed.add(wid)
