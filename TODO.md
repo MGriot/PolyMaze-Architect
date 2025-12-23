@@ -18,9 +18,9 @@
 *   [DONE] [src/views.py] **Robust Triangular Rendering**. Implemented equilateral tiling and vertex-based edge detection.
 *   [DONE] [src/views.py] **Enhanced Polar Layout**. Added center hole padding for improved navigability.
 *   [DONE] [src/views.py] **Fix Performance Warning**. Refactored `MenuView` to use `arcade.Text` objects.
-*   [MEDIUM] [src/views.py] **Decompose GameView**. Extract rendering logic into a `MazeRenderer` class.
-*   [MEDIUM] [src/config.py] Implement schema validation for `themes.json` loading.
+*   [DONE] [src/renderer.py] **Decompose GameView**. Extracted all rendering and coordinate logic into a dedicated class.
+*   [DONE] [src/config.py] Implement **Schema Validation** for `themes.json` loading.
 
 ## Documentation (Priority: Low)
-*   [LOW] [docs/algorithms.md] Add specific documentation explaining the trade-offs of the new algorithms.
-*   [LOW] [src/views.py] Add type hints (mypy) to all UI classes.
+*   [DONE] [docs/algorithms.md] Add specific documentation explaining the trade-offs of the new algorithms.
+*   [DONE] [src/views.py] Add type hints (mypy) to all UI classes.
