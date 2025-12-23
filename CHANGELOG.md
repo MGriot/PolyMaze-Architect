@@ -10,26 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **New Maze Algorithms:**
     - Added **Hunt and Kill** algorithm.
-    - Added **Eller's Algorithm**.
+    - Added **Eller's Algorithm** (row-by-row generation).
 - **New Grid Topologies:**
-    - **Triangular Grid**: Added support for triangular tessellation.
-    - **Polar (Circular) Grid**: Added concentric circle topology with center padding (hole) for better driveability.
+    - **Triangular Grid**: Perfect equilateral tessellation.
+    - **Polar (Circular) Grid**: Concentric circles with center-hole padding for navigability.
 - **Features:**
-    - **Independent Shapes**: Decoupled "Cell Shape" (Square, Hex, Tri, Polar) from "Maze Form" (Rectangle, Circle, Triangle, Hexagon).
-    - **Masking System**: Added geometric masking to apply any maze form to any cell grid.
-    - **Random Endpoints**: Added toggle for randomized start/end points within valid active boundaries.
-    - **Shape-Aware Generation**: Generators now strictly respect the chosen maze form.
-- **Testing:**
-    - Initialized comprehensive Unit Test suite.
+    - **Independent Shapes**: Decoupled "Cell Shape" from "Maze Form".
+    - **Masking System**: Apply any form (Circle, triangle, etc.) to any cell type.
+    - **Discrete Movement**: Snappy cell-based navigation using Arrow keys or **WASD**.
+    - **Solution Path**: Re-implemented solution toggle using the **'X'** key.
 
 ### Changed
-- **Rendering Engine**:
-    - **Precise Tri-Tiling**: Implemented equilateral triangle tiling with crisp vertex-based wall rendering.
-    - **Duplicate Line Elimination**: Optimized wall detection to ensure shared edges are drawn only once.
-- **UI**: Refactored `MenuView` to use efficient text rendering objects, resolving performance warnings.
-- **Architecture**: Refactored `Grid` classes to `*CellGrid` to clarify the separation between cell topology and maze boundaries.
+- **Architecture**:
+    - Extracted `MazeRenderer` class to handle all coordinate and wall-detection logic.
+    - Refactored `GameView` to use discrete state-based movement instead of velocity physics.
+- **Rendering**:
+    - Implemented high-precision coordinate rounding to eliminate duplicate lines.
+    - Updated generation phase to show accurate equilateral triangle/hex outlines.
 
 ### Fixed
-- Fixed critical crashes (`AttributeError`) in `GameView` setup.
+- Fixed critical crash when drawing player sprites (`AttributeError`).
+- Fixed `TypeError` in Sprite initialization across different library versions.
 - Fixed logic gap where generation and solvers would ignore shape boundaries.
 - Fixed starting and ending points sometimes spawning outside the maze shape.
