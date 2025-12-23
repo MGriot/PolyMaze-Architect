@@ -1,5 +1,6 @@
 # views.py
 import arcade
+import arcade.camera
 import arcade.shape_list
 import config
 import math
@@ -125,8 +126,9 @@ class GameView(arcade.View):
         self.start_time: float = 0; self.solve_duration: float = 0; self.game_won: bool = False; self.cells_visited: set = set()
         self.start_pos: Tuple[int, int, int] = (0,0,0); self.end_pos: Tuple[int, int, int] = (0,0,0)
         
-        self.maze_camera = arcade.Camera(config.SCREEN_WIDTH, config.SCREEN_HEIGHT)
-        self.gui_camera = arcade.Camera(config.SCREEN_WIDTH, config.SCREEN_HEIGHT)
+        # Cameras for Arcade 3.x
+        self.maze_camera = arcade.camera.Camera2D()
+        self.gui_camera = arcade.camera.Camera2D()
 
     def setup(self, GridClass: Type[Grid], shape: str, rows: int, cols: int, levels: int, generator: MazeGenerator, gen_name: str, animate: bool, braid_pct: float, show_trace: bool, random_endpoints: bool):
         self.gen_name, self.braid_pct, self.grid = gen_name, braid_pct, GridClass(rows, cols, levels)
@@ -137,7 +139,7 @@ class GameView(arcade.View):
         else: gtype = "rect"
         
         # Consistent larger scale for camera navigation
-        rad = 40
+        rad = 45
         self.renderer = MazeRenderer(self.grid, rad, gtype, self.top_margin, self.bottom_margin)
         self.show_trace, self.current_level, self.path_history, self.solution_path, self.show_map, self.game_won = show_trace, 0, [], [], False, False
         self.cells_visited, self.player_list, self.grid_shapes = set(), arcade.SpriteList(), arcade.shape_list.ShapeElementList()
@@ -178,9 +180,17 @@ class GameView(arcade.View):
 
     def scroll_to_player(self, instant=False):
         if not self.player_sprite: return
-        tx = self.player_sprite.center_x - config.SCREEN_WIDTH/2
-        ty = self.player_sprite.center_y - config.SCREEN_HEIGHT/2
-        self.maze_camera.move_to((tx, ty), 1.0 if instant else 0.1)
+        # In Arcade 3.x, Camera2D position is the center of the viewport
+        if instant:
+            self.maze_camera.position = (self.player_sprite.center_x, self.player_sprite.center_y)
+        else:
+            # Smooth interpolation
+            curr_x, curr_y = self.maze_camera.position
+            dest_x, dest_y = self.player_sprite.center_x, self.player_sprite.center_y
+            self.maze_camera.position = (
+                curr_x + (dest_x - curr_x) * 0.1,
+                curr_y + (dest_y - curr_y) * 0.1
+            )
 
     def finish_generation(self):
         try:
@@ -189,7 +199,9 @@ class GameView(arcade.View):
             self.stair_shapes_layers = [self.renderer.create_stair_shapes(l) for l in range(self.grid.levels)]; self.generate_map_shapes()
             sr, sc, sl = self.start_pos; self.player_cell = self.grid.get_cell(sr, sc, sl); px, py = self.renderer.get_pixel(sr, sc)
             rad = int(self.renderer.cell_radius * 0.3)
-            self.player_sprite = arcade.Sprite(); self.player_sprite.texture = arcade.make_circle_texture(rad*2, config.PLAYER_COLOR)
+            # Safe texture initialization for Sprite
+            self.player_sprite = arcade.Sprite()
+            self.player_sprite.texture = arcade.make_circle_texture(rad * 2, config.PLAYER_COLOR)
             self.player_sprite.center_x, self.player_sprite.center_y = px, py; self.player_list.append(self.player_sprite)
             self.target_pos, self.path_history, self.start_time, self.cells_visited = (px, py), [((px, py), sl)], time.time(), set([(sr, sc, sl)])
             self.update_hud(); self.scroll_to_player(True)
@@ -225,6 +237,8 @@ class GameView(arcade.View):
         try:
             self.clear()
             if self.show_map: self.gui_camera.use(); self.draw_map_overlay(); return
+            
+            # Draw maze content through following camera
             self.maze_camera.use()
             if self.generating:
                 self.grid_shapes.draw()
@@ -243,6 +257,8 @@ class GameView(arcade.View):
                     if len(pts) > 1: arcade.draw_line_strip(pts, config.PATH_TRACE_COLOR, 2)
                 if self.current_level == self.end_pos[2]: gx, gy = self.renderer.get_pixel(self.end_pos[0], self.end_pos[1]); arcade.draw_circle_filled(gx, gy, self.renderer.cell_radius*0.4, config.GOAL_COLOR)
                 self.player_list.draw()
+            
+            # Draw UI through fixed camera
             self.gui_camera.use()
             if self.generating: self.status_text.draw()
             else:
@@ -258,6 +274,7 @@ class GameView(arcade.View):
                     for _ in range(50): next(self.gen_iterator)
                 except (StopIteration, TypeError): self.finish_generation()
                 self.scroll_to_player(); return
+            
             self.scroll_to_player()
             if self.game_won: return
             if self.solving and self.sol_iterator:
