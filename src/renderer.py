@@ -22,12 +22,11 @@ class MazeRenderer:
             return start_x + c*w + (w/2 if r % 2 == 1 else 0) + w/2, start_y + r*h + R
         elif self.grid_type == "tri":
             s = R * math.sqrt(3)
-            # Perfect shared base tiling using row-step R
             grid_w = (self.grid.columns + 1) * (s/2)
-            grid_h = self.grid.rows * R + 0.5 * R
+            grid_h = self.grid.rows * 1.5 * R
             start_x, start_y = ox - grid_w/2, oy - grid_h/2
             cx = start_x + (c + 1) * (s/2)
-            cy = start_y + r * R + (0.5 * R if (r + c) % 2 == 0 else R)
+            cy = start_y + r * 1.5 * R + (0.5 * R if (r + c) % 2 == 0 else R)
             return cx, cy
         elif self.grid_type == "polar":
             rw = R * 1.5
@@ -69,9 +68,8 @@ class MazeRenderer:
                         self._add_to_list(shapes, (cx+R*math.cos(a1), cy+R*math.sin(a1)), (cx+R*math.cos(a2), cy+R*math.sin(a2)), processed, thickness)
             elif self.grid_type == "tri":
                 p1, p2, p3 = self.get_tri_verts(r, c, cx, cy, R)
-                # Correct neighbor deltas for Row-Step R
-                if (r + c) % 2 == 0: edges = [(p2, p3, (1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
-                else: edges = [(p2, p3, (-1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
+                if (r + c) % 2 == 0: edges = [(p2, p3, (-1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
+                else: edges = [(p2, p3, (1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
                 for v1, v2, (dr, dc) in edges:
                     n = self.grid.get_cell(r+dr, c+dc, level)
                     if not n or not cell.is_linked(n): self._add_to_list(shapes, v1, v2, processed, thickness)

@@ -101,7 +101,7 @@ class MenuView(arcade.View):
         _, GridClass = self.cell_types[self.cell_idx]
         shape = self.shapes[self.shape_idx]; _, rows, cols = self.sizes[self.size_idx]
         gen_name, GenClass = self.generators[self.gen_idx]
-        game = GameView(); game.setup(GridClass, shape, rows, cols, self.levels, GenClass(), gen_name, self.animate, braid, self.show_trace, self.random_endpoints)
+        game = GameView(); game.setup(GridClass, shape, rows, cols, self.levels, GenClass(), gen_name, self.animate, 0.5 if self.multi_path else 0.0, self.show_trace, self.random_endpoints)
         self.window.show_view(game)
 
 class GameView(arcade.View):
@@ -146,10 +146,10 @@ class GameView(arcade.View):
                 if gtype == "hex": pts = [(cx + rad*math.cos(math.radians(a)), cy + rad*math.sin(math.radians(a))) for a in [30, 90, 150, 210, 270, 330]]
                 elif gtype == "tri": pts = self.renderer.get_tri_verts(cell.row, cell.column, cx, cy, rad)
                 else: pts = [(cx-rad, cy-rad), (cx+rad, cy-rad), (cx+rad, cy+rad), (cx-rad, cy+rad)]
-                self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (100, 100, 100), 1))
+                self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (60, 60, 60), 1))
         self.setup_ui_text(); valid_cells = list(self.grid.each_cell())
         if valid_cells:
-            if random_endpoints: self.start_pos = random.choice(valid_cells).row, random.choice(valid_cells).column, 0; self.end_pos = random.choice(valid_cells).row, random.choice(valid_cells).column, levels-1
+            if random_endpoints: self.start_pos = (random.choice(valid_cells).row, random.choice(valid_cells).column, 0); self.end_pos = (random.choice(valid_cells).row, random.choice(valid_cells).column, levels-1)
             else:
                 valid_cells.sort(key=lambda c: (c.level, c.row, c.column))
                 self.start_pos = (valid_cells[0].row, valid_cells[0].column, 0); self.end_pos = (valid_cells[-1].row, valid_cells[-1].column, levels-1)
@@ -161,7 +161,7 @@ class GameView(arcade.View):
 
     def setup_ui_text(self):
         self.hud_text_1 = arcade.Text("", 20, config.SCREEN_HEIGHT-35, config.TEXT_COLOR, font_size=14, bold=True)
-        self.hud_text_2 = arcade.Text("WASD/ARROWS: Move | S: Sol | TAB: AI | M: Architectural Map | P: Print | ESC: Menu", 20, config.SCREEN_HEIGHT-60, config.WALL_COLOR, font_size=11)
+        self.hud_text_2 = arcade.Text("WASD/ARROWS: Move | X: Sol | TAB: AI | M: Architectural Map | P: Print | ESC: Menu", 20, config.SCREEN_HEIGHT-60, config.WALL_COLOR, font_size=11)
         self.status_text = arcade.Text("GENERATING...", config.SCREEN_WIDTH/2, 30, config.TEXT_COLOR, font_size=16, anchor_x="center")
         self.stair_prompt = arcade.Text("", config.SCREEN_WIDTH/2, 30, arcade.color.CYAN, font_size=18, anchor_x="center", bold=True)
         self.update_hud()
@@ -282,7 +282,7 @@ class GameView(arcade.View):
                 if ds == td and self.player_cell:
                     self.current_level = lv; target = self.grid.get_cell(self.player_cell.row, self.player_cell.column, lv) if self.grid else None
                     if target and self.player_cell.is_linked(target): self.player_cell = target; px, py = self.renderer.get_pixel(target.row, target.column); self.player_sprite.center_x, self.player_sprite.center_y = px, py; self.target_pos = (px, py); self.update_hud(); break
-        elif key == arcade.key.S:
+        elif key == arcade.key.X:
             self.show_solution = not self.show_solution
             if self.show_solution and self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
         elif key == arcade.key.TAB:
