@@ -151,10 +151,11 @@ class TriCellGrid(Grid):
             for row in level:
                 for cell in row:
                     r, c, l = cell.row, cell.column, cell.level
+                    # Correct Adjacency deltas for Row-Step R tiling
                     if (r + c) % 2 == 0:
-                        deltas = [(0, -1), (0, 1), (-1, 0)]
+                        deltas = [(0, -1), (0, 1), (1, 0)] # Upright shares base with Below
                     else:
-                        deltas = [(0, -1), (0, 1), (1, 0)]
+                        deltas = [(0, -1), (0, 1), (-1, 0)] # Inverted shares base with Above
                     for dr, dc in deltas:
                         if 0 <= r+dr < self.rows and 0 <= c+dc < self.columns:
                             cell.neighbors.append(self.grid[l][r+dr][c+dc])
