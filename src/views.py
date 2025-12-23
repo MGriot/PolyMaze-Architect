@@ -169,14 +169,15 @@ class GameView(arcade.View):
 
     def setup_ui_text(self):
         self.hud_text_1 = arcade.Text("", 20, config.SCREEN_HEIGHT-35, config.TEXT_COLOR, font_size=14, bold=True)
-        self.hud_text_2 = arcade.Text("WASD/ARROWS: Move | X: Sol | TAB: AI | M: Architectural Map | P: Print | ESC: Menu", 20, config.SCREEN_HEIGHT-60, config.WALL_COLOR, font_size=11)
+        self.hud_text_2 = arcade.Text("WASD: Move | X: Sol | +/-: Zoom | 0: Reset | M: Map | ESC: Menu", 20, config.SCREEN_HEIGHT-60, config.WALL_COLOR, font_size=11)
         self.status_text = arcade.Text("GENERATING...", config.SCREEN_WIDTH/2, 30, config.TEXT_COLOR, font_size=16, anchor_x="center")
         self.stair_prompt = arcade.Text("", config.SCREEN_WIDTH/2, 30, arcade.color.CYAN, font_size=18, anchor_x="center", bold=True)
         self.update_hud()
 
     def update_hud(self):
         l_str = f"Floor {self.current_level+1}/{self.grid.levels}" if self.grid and self.grid.levels > 1 else ""
-        if self.hud_text_1: self.hud_text_1.text = f"{self.gen_name.upper()} ARCHITECT | {l_str}"
+        z_str = f" | Zoom: {self.maze_camera.zoom:.1f}x"
+        if self.hud_text_1: self.hud_text_1.text = f"{self.gen_name.upper()} ARCHITECT | {l_str}{z_str}"
 
     def scroll_to_player(self, instant=False):
         if not self.player_sprite: return
@@ -301,6 +302,18 @@ class GameView(arcade.View):
             return
         if key == arcade.key.M: self.show_map = not self.show_map; return
         if self.show_map: return
+
+        # Zoom Controls
+        if key in [arcade.key.EQUAL, arcade.key.PLUS]:
+            self.maze_camera.zoom = min(self.maze_camera.zoom + 0.1, 3.0)
+            self.update_hud()
+        elif key == arcade.key.MINUS:
+            self.maze_camera.zoom = max(self.maze_camera.zoom - 0.1, 0.1)
+            self.update_hud()
+        elif key in [arcade.key.KEY_0, arcade.key.NUM_0]:
+            self.maze_camera.zoom = 1.0
+            self.update_hud()
+
         dir_map = {arcade.key.UP: (0, 1), arcade.key.DOWN: (0, -1), arcade.key.LEFT: (-1, 0), arcade.key.RIGHT: (1, 0),
                    arcade.key.W: (0, 1), arcade.key.S: (0, -1), arcade.key.A: (-1, 0), arcade.key.D: (1, 0)}
         if key in dir_map:
