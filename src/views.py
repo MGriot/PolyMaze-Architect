@@ -140,7 +140,7 @@ class GameView(arcade.View):
         self.player_sprite: Optional[arcade.Sprite] = None; self.player_list: arcade.SpriteList = arcade.SpriteList()
         self.player_cell: Optional[Cell] = None; self.target_pos: Optional[Tuple[float, float]] = None
         self.current_level: int = 0; self.braid_pct: float = 0.0
-        self.path_history: List[Tuple[Tuple[float, float], int]] = []; self.show_trace: bool = True
+        self.path_history: List[Tuple[Tuple[int, int], int]] = []; self.show_trace: bool = True
         self.current_solver_idx: int = 0
         self.solvers: List[Tuple[MazeSolver, str, Tuple[int, int, int]]] = [(BFS_Solver(), "BFS", config.COLOR_SOL_BFS), (DFS_Solver(), "DFS", config.COLOR_SOL_DFS), (AStar_Solver(), "A*", config.COLOR_SOL_ASTAR)]
         self.solution_path: List[Tuple[int, int, int]] = []; self.show_solution: bool = False; self.solving: bool = False
@@ -168,7 +168,6 @@ class GameView(arcade.View):
         elif GridClass == PolarCellGrid: gtype = "polar"
         else: gtype = "rect"
         
-        # Consistent larger scale for camera navigation
         rad = 45
         self.renderer = MazeRenderer(self.grid, rad, gtype, self.top_margin, self.bottom_margin)
         self.show_trace, self.current_level, self.path_history, self.solution_path, self.show_map, self.game_won = show_trace, 0, [], [], False, False
@@ -194,7 +193,6 @@ class GameView(arcade.View):
                 s_c, e_c = valid_cells[0], valid_cells[-1]
                 self.start_pos = (s_c.row, s_c.column, s_c.level); self.end_pos = (e_c.row, e_c.column, e_c.level)
         
-        # Center camera on grid during generation
         mid_r, mid_c = self.grid.rows // 2, self.grid.columns // 2
         gx, gy = self.renderer.get_pixel(mid_r, mid_c)
         self.maze_camera.position = (gx, gy)
@@ -219,11 +217,8 @@ class GameView(arcade.View):
         z_str = f"Zoom: {self.maze_camera.zoom:.1f}x"
         t_spent = int(time.time() - self.start_time) if not self.game_won else int(self.solve_duration)
         fps = arcade.get_fps()
-        
-        if self.hud_text_1:
-            self.hud_text_1.text = f"{self.gen_name.upper()} ARCHITECT | {l_str}"
-        if self.hud_stats:
-            self.hud_stats.text = f"STEPS: {self.step_count} | TIME: {t_spent}s | {z_str} | FPS: {int(fps)}"
+        if self.hud_text_1: self.hud_text_1.text = f"{self.gen_name.upper()} ARCHITECT | {l_str}"
+        if self.hud_stats: self.hud_stats.text = f"STEPS: {self.step_count} | TIME: {t_spent}s | {z_str} | FPS: {int(fps)}"
 
     def scroll_to_player(self, instant=False):
         if not self.player_sprite: return
@@ -257,18 +252,12 @@ class GameView(arcade.View):
             off = (0, (l-(self.grid.levels-1)/2)*config.SCREEN_HEIGHT*0.22); p_center = self.renderer.get_pixel(self.grid.rows//2, self.grid.columns//2, 0.35, off)
             arcade.draw_lbwh_rectangle_filled(p_center[0]-200, p_center[1]-150, 400, 300, (50, 50, 50, 100))
             self.map_wall_shapes[l].draw(); self.map_stair_shapes[l].draw()
-            
-            # Draw solution on map
             if self.show_solution and self.solution_path:
                 pts = [self.renderer.get_pixel(r, c, 0.35, off) for r, c, lv in self.solution_path if lv == l]
                 if len(pts) > 1: arcade.draw_line_strip(pts, self.solvers[self.current_solver_idx][2], 2)
-            
-            # Draw trace on map
             if self.show_trace and len(self.path_history) > 1:
                 pts = [self.renderer.get_pixel(r, c, 0.35, off) for (r, c), lv in self.path_history if lv == l]
                 if len(pts) > 1: arcade.draw_line_strip(pts, config.PATH_TRACE_COLOR, 1)
-
-            # Markers
             if l == self.start_pos[2]: px, py = self.renderer.get_pixel(self.start_pos[0], self.start_pos[1], 0.35, off); arcade.draw_circle_filled(px, py, 4, arcade.color.WHITE)
             if l == self.end_pos[2]: px, py = self.renderer.get_pixel(self.end_pos[0], self.end_pos[1], 0.35, off); arcade.draw_circle_filled(px, py, 4, config.GOAL_COLOR)
             if l == self.current_level and self.player_cell: px, py = self.renderer.get_pixel(self.player_cell.row, self.player_cell.column, 0.35, off); arcade.draw_circle_filled(px, py, 5, config.PLAYER_COLOR)
@@ -283,23 +272,12 @@ class GameView(arcade.View):
     def draw_victory(self):
         arcade.draw_lbwh_rectangle_filled(0, 0, config.SCREEN_WIDTH, config.SCREEN_HEIGHT, (0,0,0,200)); cw, ch = config.SCREEN_WIDTH/2, config.SCREEN_HEIGHT/2
         arcade.draw_text("CONGRATULATIONS!", cw, ch+120, arcade.color.GOLD, font_size=36, anchor_x="center", bold=True)
-        
         lines = [f"Time: {int(self.solve_duration)}s", f"Cells Visited: {len(self.cells_visited)}"]
         msg = "PRESS ENTER TO RESTART"
-        
         if self.mode == "ADVENTURE":
-            engine = AdventureEngine()
-            level = engine.data["skill_level"]
-            exp = engine.data["exp"]
-            total = engine.data["total_mazes"]
-            lines.append(f"ADVENTURE LVL: {level}")
-            lines.append(f"TOTAL EXP: {exp}")
-            lines.append(f"MAZES SOLVED: {total}")
-            msg = f"LEVEL COMPLETE! PRESS ENTER FOR NEXT CHALLENGE"
-
-        lines.append("")
-        lines.append(msg)
-        
+            engine = AdventureEngine(); level, exp, total = engine.data["skill_level"], engine.data["exp"], engine.data["total_mazes"]
+            lines.append(f"ADVENTURE LVL: {level}"); lines.append(f"TOTAL EXP: {exp}"); lines.append(f"MAZES SOLVED: {total}"); msg = f"LEVEL COMPLETE! PRESS ENTER FOR NEXT CHALLENGE"
+        lines.append(""); lines.append(msg)
         for i, line in enumerate(lines): 
             color = config.HIGHLIGHT_COLOR if "ENTER" in line else config.TEXT_COLOR
             arcade.draw_text(line, cw, ch+40-i*30, color, font_size=16, anchor_x="center")
@@ -317,6 +295,7 @@ class GameView(arcade.View):
                     for link in cell.get_links():
                         if link.level == cell.level: lx, ly = self.renderer.get_pixel(link.row, link.column); arcade.draw_line(cx, cy, lx, ly, config.GENERATION_COLOR, 3)
             else:
+                # 1. Draw Maze Layers
                 if len(self.wall_shapes_layers) > self.current_level: self.wall_shapes_layers[self.current_level].draw()
                 if len(self.stair_shapes_layers) > self.current_level: self.stair_shapes_layers[self.current_level].draw()
                 if self.show_solution and self.solution_path:
@@ -326,45 +305,38 @@ class GameView(arcade.View):
                     pts = [self.renderer.get_pixel(r, c) for (r, c), l in self.path_history if l == self.current_level]
                     if len(pts) > 1: arcade.draw_line_strip(pts, config.PATH_TRACE_COLOR, 2)
                 if self.current_level == self.end_pos[2]: gx, gy = self.renderer.get_pixel(self.end_pos[0], self.end_pos[1]); arcade.draw_circle_filled(gx, gy, self.renderer.cell_radius*0.4, config.GOAL_COLOR)
-                self.player_list.draw()
                 
-                # Dynamic Lighting & Shadow Casting
+                # 2. Advanced Vision/Lighting Effect
                 if self.dark_mode and self.player_sprite:
                     px, py = self.player_sprite.center_x, self.player_sprite.center_y
-                    view_radius = self.renderer.cell_radius * 5
+                    light_radius = self.renderer.cell_radius * 5
                     
-                    # 1. Shadow Casting
+                    # A. Dynamic Shadow Volumes
                     segments = self.renderer.get_wall_segments(self.current_level)
                     for p1, p2 in segments:
-                        # Check if segment is in range
-                        d1sq = (p1[0]-px)**2 + (p1[1]-py)**2
-                        d2sq = (p2[0]-px)**2 + (p2[1]-py)**2
-                        if d1sq < view_radius**2 or d2sq < view_radius**2:
-                            # Project vertices to form shadow volume
-                            v1 = (p1[0]-px, p1[1]-py); v2 = (p2[0]-px, p2[1]-py)
-                            mag1 = math.sqrt(v1[0]**2 + v1[1]**2); mag2 = math.sqrt(v2[0]**2 + v2[1]**2)
-                            if mag1 == 0 or mag2 == 0: continue
-                            
-                            # Shadow length should cover the screen view
-                            far = view_radius * 2
-                            p1_far = (p1[0] + v1[0]/mag1 * far, p1[1] + v1[1]/mag1 * far)
-                            p2_far = (p2[0] + v2[0]/mag2 * far, p2[1] + v2[1]/mag2 * far)
-                            
-                            arcade.draw_polygon_filled([p1, p2, p2_far, p1_far], (0, 0, 0, 255))
-
-                    # 2. Gradual Darkness Gradient (concentric rings)
-                    # From transparent (center) to black (edge)
-                    steps = 10
-                    for i in range(steps):
-                        r_inner = (i / steps) * view_radius
-                        r_outer = ((i + 1) / steps) * view_radius
-                        alpha = int((i / steps) * 255)
-                        # We use a thick circle outline to create rings
-                        arcade.draw_circle_outline(px, py, (r_inner + r_outer)/2, (0,0,0,alpha), (r_outer - r_inner) + 1)
+                        if math.hypot(p1[0]-px, p1[1]-py) < light_radius*1.5 or math.hypot(p2[0]-px, p2[1]-py) < light_radius*1.5:
+                            v1, v2 = (p1[0]-px, p1[1]-py), (p2[0]-px, p2[1]-py)
+                            m1, m2 = math.hypot(*v1), math.hypot(*v2)
+                            if m1 == 0 or m2 == 0: continue
+                            f = 4000
+                            p1_f = (p1[0] + v1[0]/m1*f, p1[1] + v1[1]/m1*f)
+                            p2_f = (p2[0] + v2[0]/m2*f, p2[1] + v2[1]/m2*f)
+                            arcade.draw_polygon_filled([p1, p2, p2_f, p1_f], (0, 0, 0, 255))
                     
-                    # 3. Absolute Darkness beyond view radius
-                    arcade.draw_circle_outline(px, py, view_radius + 2000, (0,0,0,255), 4000)
+                    # B. Stepped Radial Attenuation (5 discrete darkness rings)
+                    # From transparent (center) to absolute black (edge)
+                    for i in range(1, 6):
+                        r_inner = (i-1) * self.renderer.cell_radius
+                        r_outer = i * self.renderer.cell_radius
+                        alpha = (i-1) * 51 # Alpha: 0, 51, 102, 153, 204
+                        arcade.draw_circle_outline(px, py, (r_inner + r_outer)/2, (0, 0, 0, alpha), self.renderer.cell_radius + 1)
+                    
+                    # C. Global Darkness (Everything beyond 5 cells)
+                    arcade.draw_circle_outline(px, py, light_radius + 2000, (0, 0, 0, 255), 4000)
 
+                # 3. Final layer: Player is always visible
+                self.player_list.draw()
+            
             self.gui_camera.use()
             if self.generating:
                 if self.status_text: self.status_text.draw()
@@ -385,7 +357,6 @@ class GameView(arcade.View):
                     for _ in range(50): next(self.gen_iterator)
                 except (StopIteration, TypeError): self.finish_generation()
                 self.scroll_to_player(); return
-            
             self.scroll_to_player()
             if self.game_won: return
             if self.solving and self.sol_iterator:
@@ -408,50 +379,27 @@ class GameView(arcade.View):
         except Exception: traceback.print_exc()
 
     def on_key_press(self, key: int, modifiers: int):
-        if self.generating or (self.game_won and key != arcade.key.ENTER):
-            return
-            
+        if self.generating or (self.game_won and key != arcade.key.ENTER): return
         if self.game_won and key == arcade.key.ENTER:
             if self.mode == "ADVENTURE":
-                engine = AdventureEngine()
-                # Difficulty score: levels * size_factor * topology_factor
-                diff = self.grid.levels * (self.grid.rows * self.grid.columns // 100)
+                engine = AdventureEngine(); diff = self.grid.levels * (self.grid.rows * self.grid.columns // 100)
                 if self.dark_mode: diff *= 1.5
                 engine.process_result(self.solve_duration, self.step_count, self.used_solution, self.used_map, int(diff))
-                
-                params = engine.get_next_maze_params()
-                game = GameView()
-                game.setup(mode="ADVENTURE", **params)
-                self.window.show_view(game)
-            else:
-                self.window.show_view(MenuView())
+                params = engine.get_next_maze_params(); game = GameView(); game.setup(mode="ADVENTURE", **params); self.window.show_view(game)
+            else: self.window.show_view(MenuView())
             return
-
-        if key == arcade.key.V:
-            self.dark_mode = not self.dark_mode; return
-        if key == arcade.key.M: 
-            self.show_map = not self.show_map
-            if self.show_map: self.used_map = True
-            return
-        
-        # Keys allowed in map mode
+        if key == arcade.key.V: self.dark_mode = not self.dark_mode; return
+        if key == arcade.key.M: self.show_map = not self.show_map; self.used_map = True if self.show_map else self.used_map; return
         if key == arcade.key.X:
-            self.show_solution = not self.show_solution
-            if self.show_solution:
-                self.used_solution = True
-                if self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
+            self.show_solution = not self.show_solution; self.used_solution = True if self.show_solution else self.used_solution
+            if self.show_solution and self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
             return
-        elif key == arcade.key.R:
-            self.show_trace = not self.show_trace; return
-
+        elif key == arcade.key.R: self.show_trace = not self.show_trace; return
         if self.show_map: return
-        
         if key in [arcade.key.EQUAL, arcade.key.PLUS]: self.maze_camera.zoom = min(self.maze_camera.zoom + 0.1, 3.0); self.update_hud()
         elif key == arcade.key.MINUS: self.maze_camera.zoom = max(self.maze_camera.zoom - 0.1, 0.1); self.update_hud()
         elif key in [arcade.key.KEY_0, arcade.key.NUM_0]: self.maze_camera.zoom = 1.0; self.update_hud()
-        
-        dir_map = {arcade.key.UP: (0, 1), arcade.key.DOWN: (0, -1), arcade.key.LEFT: (-1, 0), arcade.key.RIGHT: (1, 0),
-                   arcade.key.W: (0, 1), arcade.key.S: (0, -1), arcade.key.A: (-1, 0), arcade.key.D: (1, 0)}
+        dir_map = {arcade.key.UP:(0,1), arcade.key.DOWN:(0,-1), arcade.key.LEFT:(-1,0), arcade.key.RIGHT:(1,0), arcade.key.W:(0,1), arcade.key.S:(0,-1), arcade.key.A:(-1,0), arcade.key.D:(1,0)}
         if key in dir_map:
             dx_key, dy_key = dir_map[key]; best_n, best_score = None, -1.0
             if self.player_cell:

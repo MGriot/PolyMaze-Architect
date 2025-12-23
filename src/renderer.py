@@ -84,6 +84,15 @@ class MazeRenderer:
                 if not n_side or not cell.is_linked(n_side): segments.append(((ox + ir*math.cos(ts), oy + ir*math.sin(ts)), (ox + or_*math.cos(ts), oy + or_*math.sin(ts))))
         return segments
 
+    def get_nearby_vertices(self, level: int, px: float, py: float, radius: float):
+        vertices = set()
+        segments = self.get_wall_segments(level)
+        r_sq = radius ** 2
+        for p1, p2 in segments:
+            if (p1[0]-px)**2 + (p1[1]-py)**2 < r_sq: vertices.add(p1)
+            if (p2[0]-px)**2 + (p2[1]-py)**2 < r_sq: vertices.add(p2)
+        return list(vertices)
+
     def create_wall_shapes(self, level: int, scale=1.0, offset=(0,0), thickness_mult=1.0):
         shapes = arcade.shape_list.ShapeElementList()
         processed = set()
