@@ -123,8 +123,9 @@ class GameView(arcade.View):
         self.hud_text_1: Optional[arcade.Text] = None; self.hud_text_2: Optional[arcade.Text] = None; self.status_text: Optional[arcade.Text] = None; self.stair_prompt: Optional[arcade.Text] = None
         self.current_stair_options: List[Tuple[int, str]] = []; self.top_margin: int = 80; self.bottom_margin: int = 60
         self.show_map: bool = False; self.map_wall_shapes: List[arcade.shape_list.ShapeElementList] = []; self.map_stair_shapes: List[arcade.shape_list.ShapeElementList] = []
-        self.start_time: float = 0; self.solve_duration: float = 0; self.game_won: bool = False; self.cells_visited: set = set()
+        self.game_won: bool = False; self.cells_visited: set = set()
         self.start_pos: Tuple[int, int, int] = (0,0,0); self.end_pos: Tuple[int, int, int] = (0,0,0)
+        self.step_count: int = 0
         
         # Cameras for Arcade 3.x
         self.maze_camera = arcade.camera.Camera2D()
@@ -142,7 +143,7 @@ class GameView(arcade.View):
         rad = 45
         self.renderer = MazeRenderer(self.grid, rad, gtype, self.top_margin, self.bottom_margin)
         self.show_trace, self.current_level, self.path_history, self.solution_path, self.show_map, self.game_won = show_trace, 0, [], [], False, False
-        self.cells_visited, self.player_list, self.grid_shapes = set(), arcade.SpriteList(), arcade.shape_list.ShapeElementList()
+        self.cells_visited, self.player_list, self.grid_shapes, self.step_count = set(), arcade.SpriteList(), arcade.shape_list.ShapeElementList(), 0
         
         for cell in self.grid.each_cell():
             if cell.level == 0:
@@ -186,9 +187,14 @@ class GameView(arcade.View):
         self.update_hud()
 
     def update_hud(self):
-        l_str = f"Floor {self.current_level+1}/{self.grid.levels}" if self.grid and self.grid.levels > 1 else ""
-        z_str = f" | Zoom: {self.maze_camera.zoom:.1f}x"
-        if self.hud_text_1: self.hud_text_1.text = f"{self.gen_name.upper()} ARCHITECT | {l_str}{z_str}"
+        if not self.grid: return
+        l_str = f"FL {self.current_level+1}/{self.grid.levels}"
+        z_str = f"Z: {self.maze_camera.zoom:.1f}x"
+        t_spent = int(time.time() - self.start_time) if not self.game_won else int(self.solve_duration)
+        fps = arcade.get_fps()
+        
+        if self.hud_text_1:
+            self.hud_text_1.text = f"{self.gen_name.upper()} | {l_str} | {z_str} | STEPS: {self.step_count} | TIME: {t_spent}s | FPS: {int(fps)}"
 
     def scroll_to_player(self, instant=False):
         if not self.player_sprite: return
@@ -305,6 +311,7 @@ class GameView(arcade.View):
                     if link.level > l: self.current_stair_options.append((link.level, "U"))
                     elif link.level < l: self.current_stair_options.append((link.level, "D"))
                 if self.stair_prompt: self.stair_prompt.text = f"STAIRS: Press {' / '.join(['['+o[1]+']' for o in self.current_stair_options])} to move" if self.current_stair_options else ""
+            self.update_hud()
         except Exception: traceback.print_exc()
 
     def on_key_press(self, key: int, modifiers: int):
@@ -337,13 +344,19 @@ class GameView(arcade.View):
                     if mag == 0: continue
                     score = (dx_n/mag * dx_key) + (dy_n/mag * dy_key)
                     if score > 0.4 and score > best_score: best_score, best_n = score, n
-                if best_n: self.player_cell, self.target_pos = best_n, self.renderer.get_pixel(best_n.row, best_n.column)
+                if best_n:
+                    self.player_cell, self.target_pos = best_n, self.renderer.get_pixel(best_n.row, best_n.column)
+                    self.step_count += 1
         elif key in [arcade.key.U, arcade.key.D]:
             td = "U" if key == arcade.key.U else "D"
             for lv, ds in self.current_stair_options:
                 if ds == td and self.player_cell:
                     self.current_level = lv; target = self.grid.get_cell(self.player_cell.row, self.player_cell.column, lv) if self.grid else None
-                    if target and self.player_cell.is_linked(target): self.player_cell = target; px, py = self.renderer.get_pixel(target.row, target.column); self.player_sprite.center_x, self.player_sprite.center_y = px, py; self.target_pos = (px, py); self.update_hud(); break
+                    if target and self.player_cell.is_linked(target):
+                        self.player_cell = target; px, py = self.renderer.get_pixel(target.row, target.column)
+                        self.player_sprite.center_x, self.player_sprite.center_y = px, py; self.target_pos = (px, py)
+                        self.step_count += 1
+                        self.update_hud(); break
         elif key == arcade.key.X:
             self.show_solution = not self.show_solution
             if self.show_solution and self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
