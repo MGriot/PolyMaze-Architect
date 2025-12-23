@@ -17,10 +17,13 @@ from maze_algorithms import (
     MazeGenerator, MazeSolver, BFS_Solver, DFS_Solver, AStar_Solver
 )
 from renderer import MazeRenderer
+from adventure_engine import AdventureEngine
 
 class MenuView(arcade.View):
     def __init__(self):
         super().__init__()
+        self.modes: List[str] = ["CREATIVE", "ADVENTURE"]
+        self.mode_idx: int = 0
         self.cell_types: List[Tuple[str, Type[Grid]]] = [("Square", SquareCellGrid), ("Hexagonal", HexCellGrid), ("Triangular", TriCellGrid), ("Polar", PolarCellGrid)]
         self.cell_idx: int = 0
         self.shapes: List[str] = ["rectangle", "circle", "triangle", "hexagon"]
@@ -54,14 +57,26 @@ class MenuView(arcade.View):
 
     def update_options(self):
         cw, ch = config.SCREEN_WIDTH / 2, config.SCREEN_HEIGHT / 2
-        options = [
-            f"G: Cell Shape -> {self.cell_types[self.cell_idx][0]}",
-            f"F: Maze Form -> {self.shapes[self.shape_idx].upper()}",
-            f"Z: Size -> {self.sizes[self.size_idx][0]}",
-            f"A: Algorithm -> {self.generators[self.gen_idx][0]}",
-            f"V: Animation -> {'ENABLED' if self.animate else 'DISABLED'}",
-            f"M: Multi-Path -> {'ON' if self.multi_path else 'OFF'}",
-            f"L: 3D Levels -> {self.levels}",
+        options = [f"MODE: {self.modes[self.mode_idx]} (Press TAB to switch)"]
+        
+        if self.modes[self.mode_idx] == "CREATIVE":
+            options += [
+                f"G: Cell Shape -> {self.cell_types[self.cell_idx][0]}",
+                f"F: Maze Form -> {self.shapes[self.shape_idx].upper()}",
+                f"Z: Size -> {self.sizes[self.size_idx][0]}",
+                f"A: Algorithm -> {self.generators[self.gen_idx][0]}",
+                f"V: Animation -> {'ENABLED' if self.animate else 'DISABLED'}",
+                f"M: Multi-Path -> {'ON' if self.multi_path else 'OFF'}",
+                f"L: 3D Levels -> {self.levels}",
+            ]
+        else:
+            options += [
+                "Difficulty will adapt to your skill.",
+                "Complete mazes to level up.",
+                "", "", "", "", ""
+            ]
+
+        options += [
             f"E: Random Endpoints -> {'ON' if self.random_endpoints else 'OFF'}",
             f"R: Show Trace -> {'ON' if self.show_trace else 'OFF'}",
             f"T: Theme -> {config.CURRENT_THEME_NAME.upper()}",
@@ -81,13 +96,14 @@ class MenuView(arcade.View):
 
     def on_key_press(self, key: int, modifiers: int):
         changed = True
-        if key == arcade.key.G: self.cell_idx = (self.cell_idx + 1) % len(self.cell_types)
-        elif key == arcade.key.F: self.shape_idx = (self.shape_idx + 1) % len(self.shapes)
-        elif key == arcade.key.Z: self.size_idx = (self.size_idx + 1) % len(self.sizes)
-        elif key == arcade.key.A: self.gen_idx = (self.gen_idx + 1) % len(self.generators)
-        elif key == arcade.key.V: self.animate = not self.animate
-        elif key == arcade.key.M: self.multi_path = not self.multi_path
-        elif key == arcade.key.L: self.levels = (self.levels % 4) + 1
+        if key == arcade.key.TAB: self.mode_idx = (self.mode_idx + 1) % len(self.modes)
+        elif key == arcade.key.G and self.modes[self.mode_idx] == "CREATIVE": self.cell_idx = (self.cell_idx + 1) % len(self.cell_types)
+        elif key == arcade.key.F and self.modes[self.mode_idx] == "CREATIVE": self.shape_idx = (self.shape_idx + 1) % len(self.shapes)
+        elif key == arcade.key.Z and self.modes[self.mode_idx] == "CREATIVE": self.size_idx = (self.size_idx + 1) % len(self.sizes)
+        elif key == arcade.key.A and self.modes[self.mode_idx] == "CREATIVE": self.gen_idx = (self.gen_idx + 1) % len(self.generators)
+        elif key == arcade.key.V and self.modes[self.mode_idx] == "CREATIVE": self.animate = not self.animate
+        elif key == arcade.key.M and self.modes[self.mode_idx] == "CREATIVE": self.multi_path = not self.multi_path
+        elif key == arcade.key.L and self.modes[self.mode_idx] == "CREATIVE": self.levels = (self.levels % 4) + 1
         elif key == arcade.key.E: self.random_endpoints = not self.random_endpoints
         elif key == arcade.key.R: self.show_trace = not self.show_trace
         elif key == arcade.key.T:
@@ -99,10 +115,19 @@ class MenuView(arcade.View):
         if changed: self.update_options()
 
     def start_game(self):
-        _, GridClass = self.cell_types[self.cell_idx]
-        shape = self.shapes[self.shape_idx]; _, rows, cols = self.sizes[self.size_idx]
-        gen_name, GenClass = self.generators[self.gen_idx]
-        game = GameView(); game.setup(GridClass, shape, rows, cols, self.levels, GenClass(), gen_name, self.animate, 0.5 if self.multi_path else 0.0, self.show_trace, self.random_endpoints)
+        game = GameView()
+        mode = self.modes[self.mode_idx]
+        
+        if mode == "ADVENTURE":
+            engine = AdventureEngine()
+            params = engine.get_next_maze_params()
+            game.setup(mode=mode, **params)
+        else:
+            _, GridClass = self.cell_types[self.cell_idx]
+            shape = self.shapes[self.shape_idx]; _, rows, cols = self.sizes[self.size_idx]
+            gen_name, GenClass = self.generators[self.gen_idx]
+            game.setup(GridClass, shape, rows, cols, self.levels, GenClass(), gen_name, self.animate, 0.5 if self.multi_path else 0.0, self.show_trace, self.random_endpoints, mode=mode)
+        
         self.window.show_view(game)
 
 class GameView(arcade.View):
@@ -127,13 +152,16 @@ class GameView(arcade.View):
         self.game_won: bool = False; self.cells_visited: set = set()
         self.start_pos: Tuple[int, int, int] = (0,0,0); self.end_pos: Tuple[int, int, int] = (0,0,0)
         self.step_count: int = 0; self.start_time: float = 0; self.solve_duration: float = 0
+        self.mode: str = "CREATIVE"; self.used_solution: bool = False; self.used_map: bool = False
+        self.dark_mode: bool = False; self.shadow_texture: Optional[arcade.Texture] = None
         
         # Cameras for Arcade 3.x
         self.maze_camera = arcade.camera.Camera2D()
         self.gui_camera = arcade.camera.Camera2D()
 
-    def setup(self, GridClass: Type[Grid], shape: str, rows: int, cols: int, levels: int, generator: MazeGenerator, gen_name: str, animate: bool, braid_pct: float, show_trace: bool, random_endpoints: bool):
-        self.gen_name, self.braid_pct, self.grid = gen_name, braid_pct, GridClass(rows, cols, levels)
+    def setup(self, GridClass: Type[Grid], shape: str, rows: int, cols: int, levels: int, generator: MazeGenerator, gen_name: str, animate: bool, braid_pct: float, show_trace: bool, random_endpoints: bool, mode: str = "CREATIVE", dark_mode: bool = False):
+        self.gen_name, self.braid_pct, self.grid, self.mode, self.dark_mode = gen_name, braid_pct, GridClass(rows, cols, levels), mode, dark_mode
+        self.used_solution, self.used_map = False, False
         self.grid.mask_shape(shape)
         if GridClass == HexCellGrid: gtype = "hex"
         elif GridClass == TriCellGrid: gtype = "tri"
@@ -179,7 +207,7 @@ class GameView(arcade.View):
 
     def setup_ui_text(self):
         self.hud_text_1 = arcade.Text("", 20, config.SCREEN_HEIGHT - 25, config.TEXT_COLOR, font_size=12, bold=True)
-        self.hud_text_2 = arcade.Text("WASD: Move | X: Sol | R: Trace | +/-: Zoom | 0: Reset | M: Map | ESC: Menu", 20, config.SCREEN_HEIGHT - 65, config.WALL_COLOR, font_size=10)
+        self.hud_text_2 = arcade.Text("WASD: Move | X: Sol | R: Trace | V: Vision | +/-: Zoom | 0: Reset | M: Map | ESC: Menu", 20, config.SCREEN_HEIGHT - 65, config.WALL_COLOR, font_size=10)
         self.hud_stats = arcade.Text("", config.SCREEN_WIDTH - 20, config.SCREEN_HEIGHT - 25, config.HIGHLIGHT_COLOR, font_size=12, anchor_x="right", bold=True)
         self.status_text = arcade.Text("GENERATING...", config.SCREEN_WIDTH/2, 30, config.TEXT_COLOR, font_size=16, anchor_x="center")
         self.stair_prompt = arcade.Text("", config.SCREEN_WIDTH/2, 30, arcade.color.CYAN, font_size=18, anchor_x="center", bold=True)
@@ -254,9 +282,27 @@ class GameView(arcade.View):
 
     def draw_victory(self):
         arcade.draw_lbwh_rectangle_filled(0, 0, config.SCREEN_WIDTH, config.SCREEN_HEIGHT, (0,0,0,200)); cw, ch = config.SCREEN_WIDTH/2, config.SCREEN_HEIGHT/2
-        arcade.draw_text("CONGRATULATIONS!", cw, ch+80, arcade.color.GOLD, font_size=36, anchor_x="center", bold=True)
-        stats = [f"Time: {int(self.solve_duration)}s", f"Cells: {len(self.cells_visited)}", "", "PRESS ENTER TO RESTART"]
-        for i, line in enumerate(stats): arcade.draw_text(line, cw, ch-20-i*30, config.HIGHLIGHT_COLOR if "ENTER" in line else config.TEXT_COLOR, font_size=16, anchor_x="center")
+        arcade.draw_text("CONGRATULATIONS!", cw, ch+120, arcade.color.GOLD, font_size=36, anchor_x="center", bold=True)
+        
+        lines = [f"Time: {int(self.solve_duration)}s", f"Cells Visited: {len(self.cells_visited)}"]
+        msg = "PRESS ENTER TO RESTART"
+        
+        if self.mode == "ADVENTURE":
+            engine = AdventureEngine()
+            level = engine.data["skill_level"]
+            exp = engine.data["exp"]
+            total = engine.data["total_mazes"]
+            lines.append(f"ADVENTURE LVL: {level}")
+            lines.append(f"TOTAL EXP: {exp}")
+            lines.append(f"MAZES SOLVED: {total}")
+            msg = f"LEVEL COMPLETE! PRESS ENTER FOR NEXT CHALLENGE"
+
+        lines.append("")
+        lines.append(msg)
+        
+        for i, line in enumerate(lines): 
+            color = config.HIGHLIGHT_COLOR if "ENTER" in line else config.TEXT_COLOR
+            arcade.draw_text(line, cw, ch+40-i*30, color, font_size=16, anchor_x="center")
 
     def on_draw(self):
         try:
@@ -281,7 +327,44 @@ class GameView(arcade.View):
                     if len(pts) > 1: arcade.draw_line_strip(pts, config.PATH_TRACE_COLOR, 2)
                 if self.current_level == self.end_pos[2]: gx, gy = self.renderer.get_pixel(self.end_pos[0], self.end_pos[1]); arcade.draw_circle_filled(gx, gy, self.renderer.cell_radius*0.4, config.GOAL_COLOR)
                 self.player_list.draw()
-            
+                
+                # Dynamic Lighting & Shadow Casting
+                if self.dark_mode and self.player_sprite:
+                    px, py = self.player_sprite.center_x, self.player_sprite.center_y
+                    view_radius = self.renderer.cell_radius * 5
+                    
+                    # 1. Shadow Casting
+                    segments = self.renderer.get_wall_segments(self.current_level)
+                    for p1, p2 in segments:
+                        # Check if segment is in range
+                        d1sq = (p1[0]-px)**2 + (p1[1]-py)**2
+                        d2sq = (p2[0]-px)**2 + (p2[1]-py)**2
+                        if d1sq < view_radius**2 or d2sq < view_radius**2:
+                            # Project vertices to form shadow volume
+                            v1 = (p1[0]-px, p1[1]-py); v2 = (p2[0]-px, p2[1]-py)
+                            mag1 = math.sqrt(v1[0]**2 + v1[1]**2); mag2 = math.sqrt(v2[0]**2 + v2[1]**2)
+                            if mag1 == 0 or mag2 == 0: continue
+                            
+                            # Shadow length should cover the screen view
+                            far = view_radius * 2
+                            p1_far = (p1[0] + v1[0]/mag1 * far, p1[1] + v1[1]/mag1 * far)
+                            p2_far = (p2[0] + v2[0]/mag2 * far, p2[1] + v2[1]/mag2 * far)
+                            
+                            arcade.draw_polygon_filled([p1, p2, p2_far, p1_far], (0, 0, 0, 255))
+
+                    # 2. Gradual Darkness Gradient (concentric rings)
+                    # From transparent (center) to black (edge)
+                    steps = 10
+                    for i in range(steps):
+                        r_inner = (i / steps) * view_radius
+                        r_outer = ((i + 1) / steps) * view_radius
+                        alpha = int((i / steps) * 255)
+                        # We use a thick circle outline to create rings
+                        arcade.draw_circle_outline(px, py, (r_inner + r_outer)/2, (0,0,0,alpha), (r_outer - r_inner) + 1)
+                    
+                    # 3. Absolute Darkness beyond view radius
+                    arcade.draw_circle_outline(px, py, view_radius + 2000, (0,0,0,255), 4000)
+
             self.gui_camera.use()
             if self.generating:
                 if self.status_text: self.status_text.draw()
@@ -325,15 +408,38 @@ class GameView(arcade.View):
         except Exception: traceback.print_exc()
 
     def on_key_press(self, key: int, modifiers: int):
-        if self.generating or self.game_won:
-            if self.game_won and key == arcade.key.ENTER: self.window.show_view(MenuView())
+        if self.generating or (self.game_won and key != arcade.key.ENTER):
             return
-        if key == arcade.key.M: self.show_map = not self.show_map; return
+            
+        if self.game_won and key == arcade.key.ENTER:
+            if self.mode == "ADVENTURE":
+                engine = AdventureEngine()
+                # Difficulty score: levels * size_factor * topology_factor
+                diff = self.grid.levels * (self.grid.rows * self.grid.columns // 100)
+                if self.dark_mode: diff *= 1.5
+                engine.process_result(self.solve_duration, self.step_count, self.used_solution, self.used_map, int(diff))
+                
+                params = engine.get_next_maze_params()
+                game = GameView()
+                game.setup(mode="ADVENTURE", **params)
+                self.window.show_view(game)
+            else:
+                self.window.show_view(MenuView())
+            return
+
+        if key == arcade.key.V:
+            self.dark_mode = not self.dark_mode; return
+        if key == arcade.key.M: 
+            self.show_map = not self.show_map
+            if self.show_map: self.used_map = True
+            return
         
         # Keys allowed in map mode
         if key == arcade.key.X:
             self.show_solution = not self.show_solution
-            if self.show_solution and self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
+            if self.show_solution:
+                self.used_solution = True
+                if self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
             return
         elif key == arcade.key.R:
             self.show_trace = not self.show_trace; return
