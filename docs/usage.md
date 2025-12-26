@@ -1,5 +1,12 @@
 # User Guide & Controls
 
+## Launching the Application
+To start PolyMaze Architect, ensure your virtual environment is active and use the entry script:
+```bash
+python run_app.py
+```
+This script automatically configures the necessary paths.
+
 ## Main Menu
 - **ADVENTURE**: Progress through an adaptive challenge. See [Adaptive Difficulty](adaptive_difficulty.md) for details.
 - **CREATIVE / TRAINING**: Customize every aspect of the maze.

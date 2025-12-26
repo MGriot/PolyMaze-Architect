@@ -47,7 +47,11 @@ The project follows a **Strict Decoupling** strategy to ensure that logic, data,
 6. `GameView` switches cameras (World, GUI, Map) per-frame to render the centered maze, HUD overlay, or 3D architectural stack.
 7. Upon completion, `AdventureEngine` processes results, updates skill vectors, and persists state.
 
-## 4. Further Reading
+## 4. Entry Points
+- **`run_app.py`**: The recommended entry point. It automatically configures the `PYTHONPATH` and handles cross-platform pathing issues.
+- **`src/main.py`**: The main execution module. Requires the root directory to be in the `PYTHONPATH`.
+
+## 5. Further Reading
 - [**User Guide & Controls**](usage.md)
 - [**Adaptive Difficulty Logic**](adaptive_difficulty.md)
 - [**Maze Theory**](theory.md)

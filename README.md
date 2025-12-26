@@ -19,13 +19,24 @@
 
 ### 1. Requirements
 Ensure you have Python 3.10+ installed.
+
+### 2. Installation
+Set up a virtual environment and install dependencies:
 ```bash
-pip install arcade
+python -m venv .venv
+.\.venv\Scripts\activate  # Windows
+source .venv/bin/activate  # Linux/Mac
+pip install -r requirements.txt
 ```
 
-### 2. Run the App
+### 3. Run the Application
+Use the provided entry point script:
 ```bash
-python src/main.py
+python run_app.py
+```
+Alternatively, run directly from source:
+```bash
+$env:PYTHONPATH="src"; python src/main.py
 ```
 
 ## 📖 Documentation
@@ -35,6 +46,7 @@ For deeper insights, check out the following guides in the `/docs` folder:
 - [**Generation Algorithms - Trade-offs**](docs/algorithms.md): Comparative analysis of the 10 builders.
 - [**Software Architecture**](docs/architecture.md): How the modular layers work.
 - [**User Guide & Controls**](docs/usage.md): Comprehensive keybindings.
+- [**Cross-Platform Roadmap**](docs/cross_platform_roadmap.md): Strategy for Android/iOS porting.
 
 ## 📂 Project Structure
 - `src/`: Source code.
