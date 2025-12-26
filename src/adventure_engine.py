@@ -51,15 +51,20 @@ class AdventureEngine:
     def get_next_maze_params(self) -> Dict[str, Any]:
         level = self.data["skill_level"]
         
-        # Difficulty Scaling Logic
-        rows = 10 + min(level, 20)
-        cols = 15 + min(level, 25)
-        levels = 1 + (level // 10)
+        # Difficulty Scaling Logic - Expanded for larger mazes
+        rows = 10 + min(level * 2, 60)
+        cols = 15 + min(level * 2, 80)
+        levels = 1 + (level // 12)
         
-        # Dark Mode Logic: Probability increases with skill level
+        # Dark Mode / FOV Logic: Probability increases with skill level
         dark_mode = False
+        fov_radius = None
         if level > 3:
-            dark_mode = random.random() < min(0.1 + (level * 0.05), 0.7)
+            dark_mode = random.random() < min(0.1 + (level * 0.05), 0.8)
+            if dark_mode:
+                # FOV radius shrinks as level increases (harder)
+                base_rad = 10 # in cells
+                fov_radius = max(3, base_rad - (level // 10))
 
         # Topology progression
         grid_classes = [SquareCellGrid]
@@ -86,14 +91,15 @@ class AdventureEngine:
             "shape": "rectangle" if GridClass != PolarCellGrid else "circle",
             "rows": rows,
             "cols": cols,
-            "levels": min(levels, 4),
+            "levels": min(levels, 6),
             "generator": AlgoClass(),
             "gen_name": gen_name,
             "animate": level < 5,
             "braid_pct": 0.0,
             "show_trace": True,
             "random_endpoints": level > 8,
-            "dark_mode": dark_mode
+            "dark_mode": dark_mode,
+            "fov_radius": fov_radius
         }
 
     def process_result(self, time_taken: float, steps: int, used_solution: bool, used_map: bool, maze_difficulty: int):

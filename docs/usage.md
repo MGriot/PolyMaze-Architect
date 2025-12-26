@@ -14,13 +14,9 @@
 Navigate using the following keys:
 - **G**: Cycle Cell Topology (**Square, Hexagonal, Triangular, Polar**).
 - **F**: Cycle Maze Form (**Rectangle, Circle, Triangle, Hexagon**).
-<<<<<<< Updated upstream
-- **Z**: Cycle Maze Size (Small, Medium, Large).
-=======
-- **Z**: Cycle Maze Size (Small to Colossal).
->>>>>>> Stashed changes
+- **Z**: Cycle Maze Size (Small, Medium, Large, X-Large, Epic, Colossal).
 - **A**: Cycle Generation Algorithm (10 available).
-- **L**: Set number of **3D Levels** (up to 4 floors).
+- **L**: Set number of **3D Levels** (up to 6 floors).
 - **M**: Toggle **Multi-Path** (Braided) mode.
 - **V**: Toggle **Generation Animation**.
 - **E**: Toggle **Random Endpoints**.
@@ -33,6 +29,7 @@ Navigate using the following keys:
 - **WASD / Arrow Keys**: Discrete, cell-based movement with spatial alignment.
 - **U / D**: Move **Up** or **Down** levels when standing on a Stair.
 - **X**: Toggle **AI Solution** animation.
+- **V**: Toggle **Dynamic FOV** (Creative mode only).
 - **+/-**: **Zoom In / Out** (0.1x to 3.0x).
 - **0**: Reset Zoom to 1.0x.
 - **TAB**: Change the AI solver algorithm (BFS, DFS, A*).
@@ -47,7 +44,6 @@ The HUD bar at the top provides real-time information:
     - **STEPS**: Number of cells moved.
     - **TIME**: Total time spent exploring the current maze.
     - **ZOOM**: Current magnification level.
-    - **FPS**: Real-time rendering performance.
 
 ## Visual Indicators
 - **Azure Triangle**: Stair leading Up.
