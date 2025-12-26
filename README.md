@@ -8,7 +8,8 @@
 - **3D Verticality**: Generate multi-level mazes (up to 6 floors) connected by functional stairs.
 - **Algorithm Sandbox**: Choose from 10 generation algorithms (Wilson's, Prim's, Kruskal's, etc.) and 3 solvers (A*, BFS, DFS).
 - **Dynamic Lighting**: Real-time raycasted Field of View with stepped attenuation. In Adventure mode, FOV becomes a critical difficulty factor.
-- **Architectural Overview**: Toggle an "exploded" view (`M` key) to see the entire 3D structure and its connections.
+- **Explorative Map**: Toggle a "Fog of War" on the Architectural view to show only areas you've physically explored.
+- **Architectural Overview**: Toggle an "exploded" view (`M` key) with full panning and zooming support.
 - **High Performance**: Powered by the **Arcade** library with GPU-batched rendering.
 - **Themed UI**: Built-in **Dark** and **Light** modes with custom color palettes.
 

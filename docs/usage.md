@@ -21,6 +21,7 @@ Navigate using the following keys:
 - **V**: Toggle **Generation Animation**.
 - **E**: Toggle **Random Endpoints**.
 - **R**: Toggle **Trace** (Breadcrumbs).
+- **X**: Toggle **Explorative Map** (Hides unvisited areas in Map view).
 - **T**: Toggle **Dark/Light** theme.
 - **ENTER**: Begin Architecting.
 - **ESC**: Return to Main Menu.

@@ -51,38 +51,39 @@ class AdventureEngine:
     def get_next_maze_params(self) -> Dict[str, Any]:
         level = self.data["skill_level"]
         
-        # Difficulty Scaling Logic - Expanded for larger mazes
-        rows = 10 + min(level * 2, 60)
-        cols = 15 + min(level * 2, 80)
-        levels = 1 + (level // 12)
+        # Difficulty Scaling Logic - Expanded for more granular progression
+        rows = 10 + min(level * 3, 110)
+        cols = 15 + min(level * 3, 140)
+        levels = 1 + (level // 8)
         
-        # Dark Mode / FOV Logic: Probability increases with skill level
+        # Fog of War / Explorative Map Logic
+        explorative_map = False
+        if level > 2:
+            # Probability increases with level
+            explorative_map = random.random() < min(0.2 + (level * 0.08), 0.9)
+
+        # Dark Mode / FOV Logic
         dark_mode = False
         fov_radius = None
-        if level > 3:
-            dark_mode = random.random() < min(0.1 + (level * 0.05), 0.8)
+        if level > 5:
+            dark_mode = random.random() < min(0.1 + (level * 0.06), 0.85)
             if dark_mode:
-                # FOV radius shrinks as level increases (harder)
-                base_rad = 10 # in cells
-                fov_radius = max(3, base_rad - (level // 10))
+                base_rad = 12
+                fov_radius = max(2.5, base_rad - (level // 7))
 
         # Topology progression
         grid_classes = [SquareCellGrid]
-        if level > 5: grid_classes.append(TriCellGrid)
-        if level > 10: grid_classes.append(PolarCellGrid)
-        if level > 15: grid_classes.append(HexCellGrid)
+        if level > 4: grid_classes.append(TriCellGrid)
+        if level > 8: grid_classes.append(PolarCellGrid)
+        if level > 12: grid_classes.append(HexCellGrid)
         GridClass = random.choice(grid_classes)
         
         # Algorithm progression
-        algorithms = [
-            (BinaryTree, "Binary Tree"), (Sidewinder, "Sidewinder")
-        ]
-        if level > 3:
-            algorithms += [(RandomizedPrims, "Prim's"), (RecursiveDivision, "Rec. Division")]
-        if level > 7:
-            algorithms += [(Kruskals, "Kruskal's"), (HuntAndKill, "Hunt & Kill")]
-        if level > 12:
-            algorithms += [(RecursiveBacktracker, "Backtracker"), (Wilsons, "Wilson's"), (AldousBroder, "Aldous-Broder")]
+        algorithms = [(BinaryTree, "Binary Tree"), (Sidewinder, "Sidewinder")]
+        if level > 3: algorithms += [(RandomizedPrims, "Prim's"), (RecursiveDivision, "Rec. Division")]
+        if level > 7: algorithms += [(Kruskals, "Kruskal's"), (HuntAndKill, "Hunt & Kill")]
+        if level > 11: algorithms += [(RecursiveBacktracker, "Backtracker"), (Wilsons, "Wilson's"), (AldousBroder, "Aldous-Broder")]
+        if level > 15: algorithms += [(Ellers, "Eller's")]
         
         AlgoClass, gen_name = random.choice(algorithms)
         
@@ -95,11 +96,12 @@ class AdventureEngine:
             "generator": AlgoClass(),
             "gen_name": gen_name,
             "animate": level < 5,
-            "braid_pct": 0.0,
+            "braid_pct": min(0.5, level * 0.02), # Multi-path becomes common at high levels
             "show_trace": True,
-            "random_endpoints": level > 8,
+            "random_endpoints": level > 6,
             "dark_mode": dark_mode,
-            "fov_radius": fov_radius
+            "fov_radius": fov_radius,
+            "explorative_map": explorative_map
         }
 
     def process_result(self, time_taken: float, steps: int, used_solution: bool, used_map: bool, maze_difficulty: int):

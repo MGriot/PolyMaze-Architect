@@ -13,15 +13,21 @@ class MazeRenderer:
         self.bottom_margin = bottom_margin
         self.inset_factor = 0.8 
         self._segment_cache: Dict[int, List[Tuple[Tuple[float, float], Tuple[float, float]]]] = {}
+        self._pixel_cache: Dict[Tuple[int, int], Tuple[float, float]] = {}
+        self._spatial_segments: Dict[int, Dict[Tuple[int, int], List[Tuple[Tuple[float, float], Tuple[float, float]]]]] = {}
 
     def get_pixel(self, r, c, scale=1.0, offset=(0,0)):
+        if scale == 1.0 and offset == (0,0) and (r, c) in self._pixel_cache:
+            return self._pixel_cache[(r, c)]
+        
         R = self.cell_radius * scale
         ox, oy = config.SCREEN_WIDTH / 2 + offset[0], (config.SCREEN_HEIGHT - self.top_margin + self.bottom_margin) / 2 + offset[1]
         
+        res = (0.0, 0.0)
         if self.grid_type == "hex":
             w, h = math.sqrt(3) * R, 1.5 * R
             start_x, start_y = ox - (self.grid.columns + 0.5) * w / 2, oy - ((self.grid.rows - 1) * h + 2 * R) / 2
-            return start_x + c*w + (w/2 if r % 2 == 1 else 0) + w/2, start_y + r*h + R
+            res = (start_x + c*w + (w/2 if r % 2 == 1 else 0) + w/2, start_y + r*h + R)
         elif self.grid_type == "tri":
             s = R * math.sqrt(3)
             grid_w = (self.grid.columns + 1) * (s/2)
@@ -29,17 +35,21 @@ class MazeRenderer:
             start_x, start_y = ox - grid_w/2, oy - grid_h/2
             cx = start_x + (c + 1) * (s/2)
             cy = start_y + r * 1.5 * R + (0.5 * R if (r + c) % 2 == 0 else R)
-            return cx, cy
+            res = (cx, cy)
         elif self.grid_type == "polar":
             rw = R * 1.5
             radius = (rw * 2) + r * rw + rw/2
             step = 2 * math.pi / self.grid.columns
             angle = ((c + 0.5) * step) - math.pi / 2
-            return ox + radius * math.cos(angle), oy + radius * math.sin(angle)
+            res = (ox + radius * math.cos(angle), oy + radius * math.sin(angle))
         else: # rect
             s = R * 2
             start_x, start_y = ox - (self.grid.columns * s)/2, oy - (self.grid.rows * s)/2
-            return start_x + c*s + R, start_y + r*s + R
+            res = (start_x + c*s + R, start_y + r*s + R)
+        
+        if scale == 1.0 and offset == (0,0):
+            self._pixel_cache[(r, c)] = res
+        return res
 
     def get_tri_verts(self, r, c, cx, cy, R):
         s = R * math.sqrt(3)
@@ -124,17 +134,44 @@ class MazeRenderer:
                             polygons.append([(v1[0]-nx, v1[1]-ny), (v1[0]+nx, v1[1]+ny), (v2[0]+nx, v2[1]+ny), (v2[0]-nx, v2[1]-ny)])
         return list(posts.values()) + polygons
 
-    def create_fov_geometry(self, origin: Tuple[float, float], level: int, radius: float = 300) -> arcade.shape_list.ShapeElementList:
-        """Low-Poly FOV with safety padding for thick walls and corner stability."""
-        all_segments = self._get_segments(level)
-        active_segments, r2 = [], (radius * 1.5) ** 2
-        T = self.cell_radius * (1.0 - self.inset_factor)
+    def precalculate_spatial_data(self, level: int):
+        """Builds a spatial hash for wall segments to speed up FOV."""
+        segments = self._get_segments(level)
+        grid_size = self.cell_radius * 4
+        spatial_map = {}
         
-        for p1, p2 in all_segments:
-            d1, d2 = (p1[0]-origin[0])**2 + (p1[1]-origin[1])**2, (p2[0]-origin[0])**2 + (p2[1]-origin[1])**2
-            if d1 < r2 or d2 < r2:
-                active_segments.append((p1, p2))
+        for p1, p2 in segments:
+            gx1, gy1 = int(p1[0] // grid_size), int(p1[1] // grid_size)
+            gx2, gy2 = int(p2[0] // grid_size), int(p2[1] // grid_size)
+            for gx in range(min(gx1, gx2), max(gx1, gx2) + 1):
+                for gy in range(min(gy1, gy2), max(gy1, gy2) + 1):
+                    key = (gx, gy)
+                    if key not in spatial_map: spatial_map[key] = []
+                    spatial_map[key].append((p1, p2))
+        self._spatial_segments[level] = spatial_map
 
+    def create_fov_geometry(self, origin: Tuple[float, float], level: int, radius: float = 300) -> arcade.shape_list.ShapeElementList:
+        """Low-Poly FOV with spatial partitioning for high performance."""
+        if level not in self._spatial_segments:
+            self.precalculate_spatial_data(level)
+            
+        grid_size = self.cell_radius * 4
+        gx, gy = int(origin[0] // grid_size), int(origin[1] // grid_size)
+        range_inc = int(radius // grid_size) + 1
+        
+        active_segments = []
+        seen = set()
+        spatial_map = self._spatial_segments[level]
+        
+        for dx in range(-range_inc, range_inc + 1):
+            for dy in range(-range_inc, range_inc + 1):
+                cell_segments = spatial_map.get((gx + dx, gy + dy), [])
+                for seg in cell_segments:
+                    if id(seg) not in seen:
+                        active_segments.append(seg)
+                        seen.add(id(seg))
+
+        T = self.cell_radius * (1.0 - self.inset_factor)
         outer_points = []
         for i in range(60):
             angle = math.radians(i * 6)

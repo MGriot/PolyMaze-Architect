@@ -20,16 +20,19 @@ If $P$ is high, the player is finding the game too easy, and the **Skill Level**
 
 ## 3. Difficulty Parameters (The "Action Space")
 The engine adjusts the following variables to increase difficulty:
-1. **Grid Dimensions:** Incremental increase in rows and columns (up to 60x80).
-2. **Topology Type:** 
+1. **Grid Dimensions:** Granular increase in rows and columns (up to 120x155).
+2. **Explorative Map (Fog of War):** 
+   - At intermediate levels, the Architectural Map (`M`) only displays visited cells.
+   - This prevents players from "solving" the maze by looking at the exploded view.
+3. **Topology Type:** 
    - *Easy:* Square
    - *Medium:* Triangular / Polar
    - *Hard:* Hexagonal
-3. **Levels (3D):** Adding floors (up to 6) increases spatial complexity significantly.
-4. **Dynamic Field of View (FOV):** 
-   - At higher skill levels, a **Dark Mode** is triggered.
-   - The visibility radius ($R_{fov}$) shrinks as the player levels up, forcing them to rely on memory and local spatial awareness.
-5. **Algorithm Selection:**
+4. **Levels (3D):** Adding floors (up to 6) increases spatial complexity.
+5. **Dynamic Field of View (FOV):** 
+   - At high skill levels, visibility radius ($R_{fov}$) shrinks, requiring extreme local awareness.
+6. **Braid Factor:** Multi-path mazes (less dead ends) are introduced at high levels to make navigation more deceptive.
+7. **Algorithm Selection:**
    - *Simple (High Bias):* Binary Tree, Sidewinder.
    - *Medium:* Prim's, Aldous-Broder.
    - *Complex (Long Corridors):* Recursive Backtracker, Wilson's.

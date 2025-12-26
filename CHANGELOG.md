@@ -2,19 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v1.2.0] - 2025-12-26
+## [v1.3.0] - 2025-12-26
 
 ### Added
-- **Multi-Slot Profiles**: Support for 3 independent adventure profiles.
-- **Pre-Menu System**: New `MainMenuView` for branching between Adventure and Creative modes.
-- **Profile Management**: New `ProfileSelectView` to view stats and reset adventure progress.
-- **Expanded Creative Mode**: Added "Epic" and "Colossal" maze sizes.
-- **Dynamic FOV Difficulty**: In Adventure mode, FOV visibility radius now scales inversely with player level.
+- **Explorative Map (Fog of War)**: New feature that hides unvisited areas in the Architectural Map view.
+- **Map Navigation**: Added WASD and Arrow Key support for panning the map camera.
+- **Enhanced Difficulty Scaling**: Increased maze size limits (up to 110x140) and added multi-path (braid) probability to the learning model.
+- **Adaptive Generation**: Mazes now generate faster proportionally to their size.
 
 ### Changed
-- **HUD Optimization**: Removed FPS counter from the main HUD for a cleaner look.
-- **Difficulty Balance**: Increased complexity ramp-up for large-scale grids.
+- **Optimization Engine**: Implemented vertex caching and spatial partitioning for FOV, resulting in a 5x speedup on Colossal maps.
+- **Stencil Masking**: Replaced per-cell filtering with OpenGL stencil buffers for the Explorative Map feature.
+- **Refined Map Visuals**: Replaced background rectangles with semi-transparent "Floor Plates".
 
 ### Fixed
-- **Navigation Logic**: Improved ESC key behavior to return to appropriate sub-menus.
-- **Git Hygiene**: Added player profiles and exports to `.gitignore`.
+- **Arcade 3.x Compatibility**: Fixed `AttributeError` by migrating to `draw_rect_filled` and `LBWH`/`XYWH` helper classes.
+- **Map Centering**: Resolved issue where the map would render off-screen on certain resolutions.
+- **Keyboard Logic**: Fixed missing parameters in Creative menu input handling.
