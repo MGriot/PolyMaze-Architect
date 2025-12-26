@@ -534,8 +534,12 @@ class GameView(arcade.View):
 
         if self.game_won and key == arcade.key.ENTER:
             if self.mode == "ADVENTURE":
-                engine = AdventureEngine(self.adventure_slot); diff = self.grid.levels * (self.grid.rows * self.grid.columns // 100)
-                engine.process_result(self.solve_duration, self.step_count, self.used_solution, self.used_map, int(diff))
+                engine = AdventureEngine(self.adventure_slot)
+                # Calculate granular difficulty for the learning model
+                base_diff = (self.grid.rows * self.grid.columns * self.grid.levels) / 100.0
+                if self.show_fov: base_diff *= 1.5
+                if self.explorative_map: base_diff *= 1.3
+                engine.process_result(self.solve_duration, self.step_count, self.used_solution, self.used_map, int(base_diff))
                 params = engine.get_next_maze_params(); game = GameView(); game.setup(mode="ADVENTURE", adventure_slot=self.adventure_slot, **params); self.window.show_view(game)
             else: self.window.show_view(CreativeMenuView())
             return

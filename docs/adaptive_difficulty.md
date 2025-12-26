@@ -1,51 +1,36 @@
 # Adaptive Difficulty System (Adventure Mode)
 
-This document explains the "Light Machine Learning" implementation used in Adventure Mode to provide an adaptive difficulty curve for the player. Instead of a deep neural network, we use a **Heuristic-based Reinforcement Learning (RL)** approach, which is lightweight and highly predictable for game balance.
+This document explains the **Personalized Skill Profile** system used in Adventure Mode to provide a highly adaptive and personalized experience. Instead of a linear level, the system tracks a multidimensional vector of the player's abilities.
 
-## 1. Overview
-The goal is to automatically adjust the maze complexity based on the player's historical performance.
+## 1. The Multidimensional Profile
+The engine tracks four distinct skill vectors for each player:
+- **Spatial Complexity:** Ability to navigate large grids and multi-level (3D) structures.
+- **Perceptual Awareness:** Skill in navigating with limited visibility (FOV) and hidden maps (Fog of War).
+- **Structural Adaptation:** Mastery of different grid topologies (Polar, Hex, Tri) and complex algorithms.
+- **Efficiency:** Navigational logic, measured by the ability to find paths without dead-ends (Braiding) or tool assistance.
 
-## 2. The Feedback Loop
-The system tracks several metrics after each maze resolution:
-- **Solve Time ($T$):** Total seconds from start to finish.
-- **Efficiency ($E$):** Ratio of `optimal_path_length / player_steps`.
-- **Tool Usage ($U$):** Penalty multiplier for using the Map (`m`) or Solution (`x`).
-- **Level Complexity ($C$):** The difficulty rating of the maze just solved.
+## 2. The Learning Feedback Loop
+After every maze, the engine calculates a **Performance Score ($P_{score}$)**:
 
-### Scoring Formula
-A "Performance Score" ($P$) is calculated:
-$$P = \frac{C}{T \times (1 + U_{penalty})}$$
+1. **Velocity Check:** Compares solve time against an "expected time" for that specific maze complexity.
+2. **Tool Penalty:** Heavy penalties for using the AI Solution (70% reduction) or the Map (30% reduction).
+3. **Momentum:** Successive high-velocity wins without tools trigger a "Momentum" state, accelerating difficulty growth.
 
-If $P$ is high, the player is finding the game too easy, and the **Skill Level** increases.
+### Growth Formula
+Skills grow proportionally to $P_{score}$. If a player struggles (low $P_{score}$), the specific skill vector stabilizes or slightly decays to ensure the game remains fun.
 
-## 3. Difficulty Parameters (The "Action Space")
-The engine adjusts the following variables to increase difficulty:
-1. **Grid Dimensions:** Granular increase in rows and columns (up to 120x155).
-2. **Explorative Map (Fog of War):** 
-   - At intermediate levels, the Architectural Map (`M`) only displays visited cells.
-   - This prevents players from "solving" the maze by looking at the exploded view.
-3. **Topology Type:** 
-   - *Easy:* Square
-   - *Medium:* Triangular / Polar
-   - *Hard:* Hexagonal
-4. **Levels (3D):** Adding floors (up to 6) increases spatial complexity.
-5. **Dynamic Field of View (FOV):** 
-   - At high skill levels, visibility radius ($R_{fov}$) shrinks, requiring extreme local awareness.
-6. **Braid Factor:** Multi-path mazes (less dead ends) are introduced at high levels to make navigation more deceptive.
-7. **Algorithm Selection:**
-   - *Simple (High Bias):* Binary Tree, Sidewinder.
-   - *Medium:* Prim's, Aldous-Broder.
-   - *Complex (Long Corridors):* Recursive Backtracker, Wilson's.
+## 3. Dynamic Difficulty Adjustment (DDA)
+The engine translates the skill profile into maze parameters:
+- **Spatial Skill** $\rightarrow$ Rows, Columns, Floors.
+- **Perception Skill** $\rightarrow$ Triggers **Fog of War** and shrinks **FOV Radius**.
+- **Structural Skill** $\rightarrow$ Unlocks Hex/Polar topologies and harder algorithms (Wilson's, Eller's).
+- **Efficiency Skill** $\rightarrow$ Increases **Braid Factor** (less dead ends, more cycles).
 
-## 4. Implementation Strategy
-- **Persistence:** Progress is stored across three independent slots (`player_profile_1.json`, etc.).
-- **Adventure Engine:** A dedicated class (`AdventureEngine`) calculates the next maze's parameters by mapping the current Skill Level to the parameter ranges defined in a difficulty matrix.
-- **Profile Selection:** Players can manage multiple careers simultaneously, with the ability to reset progress for any specific slot.
-- **Progression:** 
-  - **Win:** Level +1.
-  - **Perfect Win (No tools, fast):** Level +2.
-  - **Struggle (Very slow):** Level +0 (Stay same to practice).
+## 4. Momentum & Grace Periods
+- **Momentum:** Winning 3+ times efficiently increases the `growth_rate`.
+- **Grace Period:** Significant struggles (very slow times or heavy tool usage) stop all growth, allowing the player to practice at their current level without further complexity spikes.
 
 ## 5. Benefits
-- **Personalized Experience:** Beginners get small, simple mazes; experts get massive, multi-level hexagonal labyrinths.
-- **Infinite Gameplay:** The procedural nature ensures the challenge never ends.
+- **Personalized Challenge:** A player who is good at logic but poor at spatial memory will get large, well-lit mazes.
+- **Anti-Frustration:** The system detects when a player is "guessing" (heavy tool use) and adjusts the perceptual challenge down.
+- **Infinite Scaling:** There are no hard level caps; the engine scales until the hardware limits are reached.

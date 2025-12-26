@@ -16,6 +16,12 @@ The project follows a **Strict Decoupling** strategy to ensure that logic, data,
 - Algorithms yield progress for non-blocking UI animations.
 - **Solvers**: AI pathfinding using BFS, DFS, and A* strategies.
 
+### Intelligence & Personalization (`adventure_engine.py`)
+- **AdventureEngine**: The project's "Director" system.
+- Implements a **Multidimensional Skill Profile** (Spatial, Perceptual, Structural, Efficiency).
+- Manages persistent JSON profiles and slot-based state.
+- Executes the adaptive learning feedback loop to dynamically scale difficulty.
+
 ### Rendering (`renderer.py`)
 - **MazeRenderer**: Encapsulates all spatial and vertex calculations.
 - Centralizes geometry generation for different cell shapes.
@@ -33,8 +39,10 @@ The project follows a **Strict Decoupling** strategy to ensure that logic, data,
 - **Discrete Movement Engine**: State-based navigation using spatial alignment (dot-product) instead of physics collisions.
 
 ## 3. Data Flow
-1. `MenuView` gathers parameters.
-2. `GameView` instantiates the `Grid` and `MazeRenderer`.
-3. `mask_shape` deactivates cells outside the target form.
-4. `MazeGenerator` yields steps until the spanning tree is complete.
-5. `GameView` switches cameras per-frame to render both the centered maze and the fixed HUD overlay.
+1. `MainMenuView` branches to `ProfileSelectView` (Adventure) or `CreativeMenuView`.
+2. `AdventureEngine` loads the specific slot's JSON and calculates maze parameters based on the multidimensional skill profile.
+3. `GameView` instantiates the `Grid` and `MazeRenderer`.
+4. `mask_shape` deactivates cells outside the target form.
+5. `MazeGenerator` yields steps until the spanning tree is complete.
+6. `GameView` switches cameras (World, GUI, Map) per-frame to render the centered maze, HUD overlay, or 3D architectural stack.
+7. Upon completion, `AdventureEngine` processes results, updates skill vectors, and persists state.
