@@ -2,20 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v1.4.0] - 2025-12-26
+## [v1.5.0] - 2025-12-26
 
 ### Added
-- **Multidimensional Adaptive Engine**: Replaced linear leveling with a 4-vector skill profile (Spatial, Perception, Structural, Efficiency).
-- **Explorative Map (Fog of War)**: Architectural Map now hides unvisited areas when enabled or triggered by difficulty.
-- **Dynamic Braid Scaling**: Mazes now transition from simple trees to complex multi-path networks based on player efficiency.
-- **Performance Momentum**: System rewards rapid, tool-free successes with accelerated growth rates.
+- **Star Collection Challenge**: Optional objective to collect 3 stars before the exit unlocks.
+- **Tiered AI Solver**: `X` key now cycles between Path-to-Exit, Path-to-Stars+Exit, and Clear.
+- **Run Reset Mechanics**: Pressing `BACKSPACE` now allows for an immediate exit from a maze.
+- **Collection Skill Vector**: New adaptive difficulty parameter tracking star retrieval proficiency.
+- **Greedy Multi-Target Solver**: New logic in `maze_algorithms.py` to calculate efficient routes through multiple waypoints.
 
 ### Changed
-- **Adaptive HUD**: Profile selection now displays calculated aggregate skill levels instead of simple integers.
-- **Enhanced Scale**: Maximum maze dimensions increased to 120x155 for the "Colossal" setting and high-level Adventure mode.
-- **Grace Periods**: Implemented logic to stabilize difficulty if the system detects a player is struggling.
+- **Adventure Balance**: Resetting a run now applies a significant XP penalty and skill decay.
+- **Score Multipliers**: Stars provide a performance bonus, while AI tools now apply harsher penalties (up to 80%).
+- **Map Legend**: Added "STAR" and "FOG" status indicators to the architectural view.
 
 ### Fixed
-- **API Synchronization**: Fully migrated to Arcade 3.x `draw_rect_filled` API across all views.
-- **Profile Integrity**: Resolved slot-mixing bugs; each profile now correctly persists to its independent JSON file.
-- **Camera Centering**: Fixed Architectural Map centering logic for high-verticality mazes.
+- **Victory Conditions**: Correctly enforced star collection requirement when active.
+- **UI Feedback**: Star counts and collection status now display in the primary HUD.

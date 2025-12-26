@@ -22,6 +22,7 @@ Navigate using the following keys:
 - **E**: Toggle **Random Endpoints**.
 - **R**: Toggle **Trace** (Breadcrumbs).
 - **X**: Toggle **Explorative Map** (Hides unvisited areas in Map view).
+- **S**: Toggle **Star Collection** (Spawn 3 stars that must be collected before exit).
 - **T**: Toggle **Dark/Light** theme.
 - **ENTER**: Begin Architecting.
 - **ESC**: Return to Main Menu.
@@ -29,8 +30,12 @@ Navigate using the following keys:
 ## Exploration (In-Game)
 - **WASD / Arrow Keys**: Discrete, cell-based movement with spatial alignment.
 - **U / D**: Move **Up** or **Down** levels when standing on a Stair.
-- **X**: Toggle **AI Solution** animation.
+- **X**: AI Solution Animation. 
+    - *1st Press*: Show path to Exit.
+    - *2nd Press*: Show path to all Stars + Exit (if Stars active).
+    - *3rd Press*: Clear Solution.
 - **V**: Toggle **Dynamic FOV** (Creative mode only).
+- **BACKSPACE**: **Reset Run**. Exits current maze (Applies XP penalty in Adventure).
 - **+/-**: **Zoom In / Out** (0.1x to 3.0x).
 - **0**: Reset Zoom to 1.0x.
 - **TAB**: Change the AI solver algorithm (BFS, DFS, A*).

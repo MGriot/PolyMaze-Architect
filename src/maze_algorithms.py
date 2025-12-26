@@ -235,8 +235,46 @@ class RecursiveDivision(MazeGenerator):
 
 class MazeSolver:
     def solve(self, grid: Grid, start: Cell, goal: Cell):
-        for path in self.solve_step(grid, start, goal): pass
-        return path
+        res = []
+        for path in self.solve_step(grid, start, goal): res = path
+        return res
+
+    def solve_multi(self, grid: Grid, start: Cell, targets: List[Cell], goal: Cell):
+        """Finds path through all targets using a greedy nearest-neighbor approach."""
+        current_start = start
+        remaining_targets = list(targets)
+        full_path = []
+        
+        while remaining_targets:
+            # Simple greedy: find nearest target from current position
+            best_target = None
+            shortest_len = float('inf')
+            best_segment = []
+            
+            for t in remaining_targets:
+                segment = self.solve(grid, current_start, t)
+                if len(segment) < shortest_len:
+                    shortest_len = len(segment)
+                    best_target = t
+                    best_segment = segment
+            
+            if full_path:
+                full_path.extend(best_segment[1:]) # Don't duplicate target/start node
+            else:
+                full_path.extend(best_segment)
+                
+            current_start = best_target
+            remaining_targets.remove(best_target)
+            yield full_path
+            
+        # Final leg to goal
+        final_segment = self.solve(grid, current_start, goal)
+        if full_path:
+            full_path.extend(final_segment[1:])
+        else:
+            full_path.extend(final_segment)
+        yield full_path
+
     def reconstruct(self, came_from, start, goal):
         path, curr = [], goal
         while curr:

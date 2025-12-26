@@ -6,7 +6,9 @@
 - **Hybrid Topologies**: Architect mazes in classic **Square**, **Triangular**, **Polar**, or organic **Hexagonal** grids.
 - **Adventure Mode**: Experience an **Adaptive Difficulty** system that learns from your performance and scales complexity accordingly.
 - **3D Verticality**: Generate multi-level mazes (up to 6 floors) connected by functional stairs.
-- **Algorithm Sandbox**: Choose from 10 generation algorithms (Wilson's, Prim's, Kruskal's, etc.) and 3 solvers (A*, BFS, DFS).
+- **Algorithm Sandbox**: Choose from 10 generation algorithms (Wilson's, Prim's, etc.) and 3 solvers (A*, BFS, DFS).
+- **Star Collection**: Optional secondary objectives that must be cleared to unlock the exit, fully integrated into the adaptive challenge model.
+- **Tiered AI Solver**: Intelligent pathfinding that can calculate routes directly to the exit or optimal paths through all required stars.
 - **Dynamic Lighting**: Real-time raycasted Field of View with stepped attenuation. In Adventure mode, FOV becomes a critical difficulty factor.
 - **Explorative Map**: Toggle a "Fog of War" on the Architectural view to show only areas you've physically explored.
 - **Architectural Overview**: Toggle an "exploded" view (`M` key) with full panning and zooming support.

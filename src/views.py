@@ -130,6 +130,7 @@ class CreativeMenuView(arcade.View):
         self.show_trace: bool = True
         self.random_endpoints: bool = True
         self.explorative_map: bool = False
+        self.collect_stars: bool = False
         self.title_text: Optional[arcade.Text] = None
         self.option_texts: List[arcade.Text] = []
 
@@ -155,6 +156,7 @@ class CreativeMenuView(arcade.View):
             f"E: Random Endpoints -> {'ON' if self.random_endpoints else 'OFF'}",
             f"R: Show Trace -> {'ON' if self.show_trace else 'OFF'}",
             f"X: Explorative Map -> {'ON' if self.explorative_map else 'OFF'}",
+            f"S: Collect Stars -> {'ON' if self.collect_stars else 'OFF'}",
             f"T: Theme -> {config.CURRENT_THEME_NAME.upper()}",
             "", "PRESS ENTER TO START", "PRESS ESC TO BACK"
         ]
@@ -182,6 +184,7 @@ class CreativeMenuView(arcade.View):
         elif key == arcade.key.E: self.random_endpoints = not self.random_endpoints
         elif key == arcade.key.R: self.show_trace = not self.show_trace
         elif key == arcade.key.X: self.explorative_map = not self.explorative_map
+        elif key == arcade.key.S: self.collect_stars = not self.collect_stars
         elif key == arcade.key.T:
             config.apply_theme("light" if config.CURRENT_THEME_NAME == "dark" else "dark")
             arcade.set_background_color(config.BG_COLOR); self.setup_ui()
@@ -194,7 +197,7 @@ class CreativeMenuView(arcade.View):
         game = GameView(); mode = "CREATIVE"
         _, GridClass = self.cell_types[self.cell_idx]; shape = self.shapes[self.shape_idx]; _, rows, cols = self.sizes[self.size_idx]
         gen_name, GenClass = self.generators[self.gen_idx]
-        game.setup(GridClass, shape, rows, cols, self.levels, GenClass(), gen_name, self.animate, 0.5 if self.multi_path else 0.0, self.show_trace, self.random_endpoints, mode=mode, explorative_map=self.explorative_map)
+        game.setup(GridClass, shape, rows, cols, self.levels, GenClass(), gen_name, self.animate, 0.5 if self.multi_path else 0.0, self.show_trace, self.random_endpoints, mode=mode, explorative_map=self.explorative_map, collect_stars=self.collect_stars)
         self.window.show_view(game)
 
 class GameView(arcade.View):
@@ -223,7 +226,8 @@ class GameView(arcade.View):
         self.start_pos: Tuple[int, int, int] = (0,0,0); self.end_pos: Tuple[int, int, int] = (0,0,0)
         self.step_count: int = 0; self.start_time: float = 0; self.solve_duration: float = 0
         self.mode: str = "CREATIVE"; self.used_solution: bool = False; self.used_map: bool = False
-        self.explorative_map: bool = False
+        self.explorative_map: bool = False; self.collect_stars: bool = False
+        self.stars: List[Cell] = []; self.stars_collected: set = set()
         self.adventure_slot: int = 1
         self.maze_camera = arcade.camera.Camera2D(); self.gui_camera = arcade.camera.Camera2D()
         self.map_camera = arcade.camera.Camera2D()
@@ -234,6 +238,8 @@ class GameView(arcade.View):
         self.used_solution, self.used_map = False, False
         self.adventure_slot = kwargs.get("adventure_slot", 1)
         self.explorative_map = kwargs.get("explorative_map", False)
+        self.collect_stars = kwargs.get("collect_stars", False)
+        self.stars, self.stars_collected = [], set()
         self.show_fov = kwargs.get("dark_mode", False)
         self.fov_radius_cells = kwargs.get("fov_radius", 6.0)
         self.grid.mask_shape(shape)
@@ -279,7 +285,8 @@ class GameView(arcade.View):
         if not self.grid: return
         l_str, z_str = f"Floor {self.current_level+1}/{self.grid.levels}", f"Zoom: {self.maze_camera.zoom:.1f}x"
         t_spent = int(time.time()-self.start_time) if not self.game_won else int(self.solve_duration)
-        if self.hud_text_1: self.hud_text_1.text = f"{self.gen_name.upper()} ARCHITECT | {l_str}"
+        star_str = f" | STARS: {len(self.stars_collected)}/{len(self.stars)}" if self.collect_stars else ""
+        if self.hud_text_1: self.hud_text_1.text = f"{self.gen_name.upper()} ARCHITECT | {l_str}{star_str}"
         if self.hud_stats: self.hud_stats.text = f"STEPS: {self.step_count} | TIME: {t_spent}s | {z_str}"
 
     def scroll_to_player(self, instant=False):
@@ -292,6 +299,12 @@ class GameView(arcade.View):
             if self.braid_pct > 0: self.grid.braid(self.braid_pct)
             self.generating = False; self.wall_shapes_layers = [self.renderer.create_wall_shapes(l) for l in range(self.grid.levels)]
             self.stair_shapes_layers = [self.renderer.create_stair_shapes(l) for l in range(self.grid.levels)]; self.generate_map_shapes()
+            
+            if self.collect_stars:
+                potential = [c for c in self.grid.each_cell() if (c.row, c.column, c.level) not in [self.start_pos, self.end_pos]]
+                if len(potential) >= 3: self.stars = random.sample(potential, 3)
+                else: self.stars = potential
+
             sr, sc, sl = self.start_pos; self.player_cell = self.grid.get_cell(sr, sc, sl); px, py = self.renderer.get_pixel(sr, sc)
             self.player_sprite = arcade.Sprite(); self.player_sprite.texture = arcade.make_circle_texture(int(self.renderer.cell_radius*0.6), config.PLAYER_COLOR)
             self.player_sprite.center_x, self.player_sprite.center_y = px, py; self.player_list.append(self.player_sprite)
@@ -357,6 +370,13 @@ class GameView(arcade.View):
             
             if l==self.start_pos[2]: px,py = self.renderer.get_pixel(self.start_pos[0],self.start_pos[1],1.0,off); arcade.draw_circle_filled(px,py,6,config.TEXT_COLOR)
             if l==self.end_pos[2]: px,py = self.renderer.get_pixel(self.end_pos[0],self.end_pos[1],1.0,off); arcade.draw_circle_filled(px,py,6,config.GOAL_COLOR)
+            
+            for star in self.stars:
+                if star.level == l:
+                    px, py = self.renderer.get_pixel(star.row, star.column, 1.0, off)
+                    color = arcade.color.GOLD if star not in self.stars_collected else (100, 100, 0, 100)
+                    arcade.draw_star_filled(px, py, color, 8, 3, 5)
+
             if l==self.current_level and self.player_cell: px,py = self.renderer.get_pixel(self.player_cell.row,self.player_cell.column,1.0,off); arcade.draw_circle_filled(px,py,8,config.PLAYER_COLOR)
 
         if self.explorative_map:
@@ -372,6 +392,7 @@ class GameView(arcade.View):
             ("WALL", config.WALL_COLOR, "rect"),
             ("PLAYER", config.PLAYER_COLOR, "circle"),
             ("GOAL", config.GOAL_COLOR, "circle"),
+            ("STAR", arcade.color.GOLD, "star"),
             ("TRACE", config.PATH_TRACE_COLOR, "line"),
             ("SOLUTION", self.solvers[self.current_solver_idx][2], "line"),
             (f"FOG: {'ACTIVE' if self.explorative_map else 'OFF'}", arcade.color.GRAY, "rect")
@@ -381,6 +402,7 @@ class GameView(arcade.View):
             y = ly + i * 25
             if shape == "rect": arcade.draw_rect_filled(arcade.LBWH(lx+2.5, y+0.5, 15, 15), color)
             elif shape == "circle": arcade.draw_circle_filled(lx+10, y+8, 7, color)
+            elif shape == "star": arcade.draw_star_filled(lx+10, y+8, color, 8, 3, 5)
             elif shape == "line": arcade.draw_line(lx+2, y+8, lx+18, y+8, color, 3)
             arcade.draw_text(name, lx+25, y+2, config.TEXT_COLOR, font_size=10, bold=True)
 
@@ -395,7 +417,9 @@ class GameView(arcade.View):
         overlay_color = config.BG_COLOR + (230,)
         arcade.draw_rect_filled(arcade.LBWH(0, 0, config.SCREEN_WIDTH, config.SCREEN_HEIGHT), overlay_color); cw, ch = config.SCREEN_WIDTH/2, config.SCREEN_HEIGHT/2
         arcade.draw_text("CONGRATULATIONS!", cw, ch+120, config.HIGHLIGHT_COLOR, font_size=36, anchor_x="center", bold=True)
-        lines, msg = [f"Time: {int(self.solve_duration)}s", f"Cells Visited: {len(self.cells_visited)}"], "PRESS ENTER TO RESTART"
+        lines = [f"Time: {int(self.solve_duration)}s", f"Cells Visited: {len(self.cells_visited)}"]
+        if self.collect_stars: lines.append(f"Stars Collected: {len(self.stars_collected)}/{len(self.stars)}")
+        msg = "PRESS ENTER TO RESTART"
         if self.mode == "ADVENTURE":
             engine = AdventureEngine(self.adventure_slot); level, exp, total = engine.data["skill_level"], engine.data["exp"], engine.data["total_mazes"]
             lines.append(f"ADVENTURE LVL: {level}"); lines.append(f"TOTAL EXP: {exp}"); lines.append(f"MAZES SOLVED: {total}"); msg = f"LEVEL COMPLETE! PRESS ENTER FOR NEXT CHALLENGE"
@@ -448,6 +472,14 @@ class GameView(arcade.View):
                     self._draw_maze_extras()
                 
                 if self.current_level == self.end_pos[2]: gx, gy = self.renderer.get_pixel(self.end_pos[0], self.end_pos[1]); arcade.draw_circle_filled(gx, gy, self.renderer.cell_radius*0.4, config.GOAL_COLOR)
+                
+                # Render Stars
+                for star in self.stars:
+                    if star.level == self.current_level:
+                        sx, sy = self.renderer.get_pixel(star.row, star.column)
+                        color = arcade.color.GOLD if star not in self.stars_collected else (100, 100, 0, 100)
+                        arcade.draw_star_filled(sx, sy, color, self.renderer.cell_radius*0.5, self.renderer.cell_radius*0.2, 5)
+
                 self.player_list.draw()
             
             self.gui_camera.use()
@@ -515,7 +547,17 @@ class GameView(arcade.View):
                 self.player_sprite.center_x += dx*0.4; self.player_sprite.center_y += dy*0.4
             if self.player_cell:
                 r, c, l = self.player_cell.row, self.player_cell.column, self.player_cell.level; self.cells_visited.add((r, c, l))
-                if (r, c, l) == self.end_pos: self.game_won, self.solve_duration = True, time.time()-self.start_time; return
+                
+                # Star Collection
+                if self.collect_stars:
+                    for star in self.stars:
+                        if (star.row, star.column, star.level) == (r, c, l):
+                            self.stars_collected.add(star)
+
+                if (r, c, l) == self.end_pos:
+                    if not self.collect_stars or len(self.stars_collected) == len(self.stars):
+                        self.game_won, self.solve_duration = True, time.time()-self.start_time; return
+                
                 if self.show_trace and (not self.path_history or self.path_history[-1][0] != (r, c) or self.path_history[-1][1] != l): self.path_history.append(((r, c), l))
                 self.current_stair_options = []
                 for link in self.player_cell.get_links():
@@ -539,15 +581,36 @@ class GameView(arcade.View):
                 base_diff = (self.grid.rows * self.grid.columns * self.grid.levels) / 100.0
                 if self.show_fov: base_diff *= 1.5
                 if self.explorative_map: base_diff *= 1.3
-                engine.process_result(self.solve_duration, self.step_count, self.used_solution, self.used_map, int(base_diff))
+                engine.process_result(self.solve_duration, self.step_count, self.used_solution, self.used_map, int(base_diff), len(self.stars_collected))
                 params = engine.get_next_maze_params(); game = GameView(); game.setup(mode="ADVENTURE", adventure_slot=self.adventure_slot, **params); self.window.show_view(game)
             else: self.window.show_view(CreativeMenuView())
             return
+        
+        # Reset Logic
+        if key == arcade.key.BACKSPACE:
+            if self.mode == "ADVENTURE":
+                engine = AdventureEngine(self.adventure_slot)
+                loss = engine.process_reset()
+                # Could add a popup text here, but simple reset for now
+            self.window.show_view(MainMenuView()) # return to main menu or restart level?
+            # Instructions said "reset the maze run", usually means start over.
+            # But let's return to menu to be safe and allow slot re-selection.
+            return
+
         if key == arcade.key.M: self.show_map = not self.show_map; self.used_map = True if self.show_map else self.used_map; return
         if key == arcade.key.V and self.mode == "CREATIVE": self.show_fov = not self.show_fov; return
         if key == arcade.key.X:
-            self.show_solution = not self.show_solution; self.used_solution = True if self.show_solution else self.used_solution
-            if self.show_solution and self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.player_cell, self.grid.get_cell(*self.end_pos))
+            # Tiered Solution Logic
+            if not self.show_solution:
+                self.show_solution = True; self.used_solution = True
+                self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.player_cell, self.grid.get_cell(*self.end_pos))
+            elif self.collect_stars and len(self.stars_collected) < len(self.stars) and not hasattr(self, '_multi_sol_shown'):
+                # Second press: Multi-target solution
+                self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_multi(self.grid, self.player_cell, [s for s in self.stars if s not in self.stars_collected], self.grid.get_cell(*self.end_pos))
+                self._multi_sol_shown = True
+            else:
+                self.show_solution = False; self.solving = False
+                if hasattr(self, '_multi_sol_shown'): del self._multi_sol_shown
             return
         elif key == arcade.key.R: self.show_trace = not self.show_trace; return
         if self.show_map:
