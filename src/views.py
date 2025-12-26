@@ -29,7 +29,10 @@ class MenuView(arcade.View):
         self.cell_idx: int = 0
         self.shapes: List[str] = ["rectangle", "circle", "triangle", "hexagon"]
         self.shape_idx: int = 0
-        self.sizes: List[Tuple[str, int, int]] = [("Small", 11, 15), ("Medium", 21, 31), ("Large", 31, 41)]
+        self.sizes: List[Tuple[str, int, int]] = [
+            ("Small", 11, 15), ("Medium", 21, 31), ("Large", 31, 41),
+            ("X-Large", 51, 71), ("Epic", 81, 101), ("Colossal", 121, 161)
+        ]
         self.size_idx: int = 1
         self.generators: List[Tuple[str, Type[MazeGenerator]]] = [
             ("Backtracker", RecursiveBacktracker), ("Prim's", RandomizedPrims),
@@ -139,7 +142,7 @@ class GameView(arcade.View):
         self.current_stair_options: List[Tuple[int, str]] = []; self.top_margin: int = 80; self.bottom_margin: int = 60
         self.show_map: bool = False; self.map_wall_shapes: List[arcade.shape_list.ShapeElementList] = []; self.map_stair_shapes: List[arcade.shape_list.ShapeElementList] = []
         self.fov_shapes: Optional[arcade.shape_list.ShapeElementList] = None
-        self.show_fov: bool = False
+        self.show_fov: bool = False; self.fov_radius_cells: float = 6.0
         self.game_won: bool = False; self.cells_visited: set = set()
         self.start_pos: Tuple[int, int, int] = (0,0,0); self.end_pos: Tuple[int, int, int] = (0,0,0)
         self.step_count: int = 0; self.start_time: float = 0; self.solve_duration: float = 0
@@ -149,6 +152,8 @@ class GameView(arcade.View):
     def setup(self, GridClass: Type[Grid], shape: str, rows: int, cols: int, levels: int, generator: MazeGenerator, gen_name: str, animate: bool, braid_pct: float, show_trace: bool, random_endpoints: bool, mode: str = "CREATIVE", **kwargs):
         self.gen_name, self.braid_pct, self.grid, self.mode = gen_name, braid_pct, GridClass(rows, cols, levels), mode
         self.used_solution, self.used_map = False, False
+        self.show_fov = kwargs.get("dark_mode", False)
+        self.fov_radius_cells = kwargs.get("fov_radius", 6.0)
         self.grid.mask_shape(shape)
         rad = 45; gtype = "hex" if GridClass == HexCellGrid else ("tri" if GridClass == TriCellGrid else ("polar" if GridClass == PolarCellGrid else "rect"))
         self.renderer = MazeRenderer(self.grid, rad, gtype, self.top_margin, self.bottom_margin)
@@ -193,7 +198,7 @@ class GameView(arcade.View):
         l_str, z_str = f"Floor {self.current_level+1}/{self.grid.levels}", f"Zoom: {self.maze_camera.zoom:.1f}x"
         t_spent = int(time.time()-self.start_time) if not self.game_won else int(self.solve_duration)
         if self.hud_text_1: self.hud_text_1.text = f"{self.gen_name.upper()} ARCHITECT | {l_str}"
-        if self.hud_stats: self.hud_stats.text = f"STEPS: {self.step_count} | TIME: {t_spent}s | {z_str} | FPS: {int(arcade.get_fps())}"
+        if self.hud_stats: self.hud_stats.text = f"STEPS: {self.step_count} | TIME: {t_spent}s | {z_str}"
 
     def scroll_to_player(self, instant=False):
         if not self.player_sprite: return
@@ -282,11 +287,12 @@ class GameView(arcade.View):
                     # 2. Render Pass: Only draw where stencil == 1
                     gl.glStencilFunc(gl.GL_EQUAL, 1, 0xFF)
                     
-                    # Draw the 6-cell radial attenuation
+                    # Draw the radial attenuation
                     cx, cy = self.player_sprite.center_x, self.player_sprite.center_y
                     step = self.renderer.cell_radius
-                    for i in range(6, 0, -1):
-                        alpha = int(100 * (1.0 - (i-1)/6))
+                    steps = int(self.fov_radius_cells)
+                    for i in range(steps, 0, -1):
+                        alpha = int(100 * (1.0 - (i-1)/steps))
                         arcade.draw_circle_filled(cx, cy, i * step, (255, 255, 255, alpha // 4))
 
                     if len(self.wall_shapes_layers) > self.current_level: self.wall_shapes_layers[self.current_level].draw()
@@ -336,7 +342,7 @@ class GameView(arcade.View):
             self.scroll_to_player()
             if self.game_won: return
             if self.show_fov and self.player_sprite:
-                fov_rad = self.renderer.cell_radius * 6
+                fov_rad = self.renderer.cell_radius * self.fov_radius_cells
                 self.fov_shapes = self.renderer.create_fov_geometry((self.player_sprite.center_x, self.player_sprite.center_y), self.current_level, radius=fov_rad)
             if self.solving and self.sol_iterator:
                 try: 
@@ -367,7 +373,7 @@ class GameView(arcade.View):
             else: self.window.show_view(MenuView())
             return
         if key == arcade.key.M: self.show_map = not self.show_map; self.used_map = True if self.show_map else self.used_map; return
-        if key == arcade.key.V: self.show_fov = not self.show_fov; return
+        if key == arcade.key.V and self.mode == "CREATIVE": self.show_fov = not self.show_fov; return
         if key == arcade.key.X:
             self.show_solution = not self.show_solution; self.used_solution = True if self.show_solution else self.used_solution
             if self.show_solution and self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.player_cell, self.grid.get_cell(*self.end_pos))

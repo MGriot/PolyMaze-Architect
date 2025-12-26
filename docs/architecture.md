@@ -19,6 +19,10 @@ The project follows a **Strict Decoupling** strategy to ensure that logic, data,
 ### Rendering (`renderer.py`)
 - **MazeRenderer**: Encapsulates all spatial and vertex calculations.
 - Centralizes geometry generation for different cell shapes.
+- **Dynamic FOV Engine**: 
+    - Implements a raycasting-based visibility system using sorted angle sweeps.
+    - Utilizes OpenGL Stencil Buffers for watertight masking of walls and entities.
+    - Supports stepped radial attenuation for a low-poly aesthetic.
 - Manages dual-view consistency (Game View vs. Architectural Map).
 
 ### Presentation (`views.py`)
