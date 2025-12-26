@@ -20,6 +20,14 @@ from maze_algorithms import (
 from renderer import MazeRenderer
 from adventure_engine import AdventureEngine
 
+def _draw_star(cx, cy, color, outer_radius, inner_radius, num_points=5):
+    points = []
+    for i in range(num_points * 2):
+        angle = math.radians(i * (180 / num_points) - 90)
+        radius = outer_radius if i % 2 == 0 else inner_radius
+        points.append((cx + radius * math.cos(angle), cy + radius * math.sin(angle)))
+    arcade.draw_polygon_filled(points, color)
+
 class MainMenuView(arcade.View):
     def __init__(self):
         super().__init__()
@@ -375,7 +383,7 @@ class GameView(arcade.View):
                 if star.level == l:
                     px, py = self.renderer.get_pixel(star.row, star.column, 1.0, off)
                     color = arcade.color.GOLD if star not in self.stars_collected else (100, 100, 0, 100)
-                    arcade.draw_star_filled(px, py, color, 8, 3, 5)
+                    _draw_star(px, py, color, 8, 3, 5)
 
             if l==self.current_level and self.player_cell: px,py = self.renderer.get_pixel(self.player_cell.row,self.player_cell.column,1.0,off); arcade.draw_circle_filled(px,py,8,config.PLAYER_COLOR)
 
@@ -402,7 +410,7 @@ class GameView(arcade.View):
             y = ly + i * 25
             if shape == "rect": arcade.draw_rect_filled(arcade.LBWH(lx+2.5, y+0.5, 15, 15), color)
             elif shape == "circle": arcade.draw_circle_filled(lx+10, y+8, 7, color)
-            elif shape == "star": arcade.draw_star_filled(lx+10, y+8, color, 8, 3, 5)
+            elif shape == "star": _draw_star(lx+10, y+8, color, 8, 3, 5)
             elif shape == "line": arcade.draw_line(lx+2, y+8, lx+18, y+8, color, 3)
             arcade.draw_text(name, lx+25, y+2, config.TEXT_COLOR, font_size=10, bold=True)
 
@@ -478,7 +486,7 @@ class GameView(arcade.View):
                     if star.level == self.current_level:
                         sx, sy = self.renderer.get_pixel(star.row, star.column)
                         color = arcade.color.GOLD if star not in self.stars_collected else (100, 100, 0, 100)
-                        arcade.draw_star_filled(sx, sy, color, self.renderer.cell_radius*0.5, self.renderer.cell_radius*0.2, 5)
+                        _draw_star(sx, sy, color, self.renderer.cell_radius*0.5, self.renderer.cell_radius*0.2, 5)
 
                 self.player_list.draw()
             
