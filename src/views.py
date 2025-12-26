@@ -168,7 +168,7 @@ class CreativeMenuView(arcade.View):
             for text in self.option_texts: text.draw()
         except Exception: traceback.print_exc()
 
-    def on_key_press(self):
+    def on_key_press(self, key: int, modifiers: int):
         changed = True
         if key == arcade.key.G: self.cell_idx = (self.cell_idx + 1) % len(self.cell_types)
         elif key == arcade.key.F: self.shape_idx = (self.shape_idx + 1) % len(self.shapes)
@@ -225,6 +225,7 @@ class GameView(arcade.View):
     def setup(self, GridClass: Type[Grid], shape: str, rows: int, cols: int, levels: int, generator: MazeGenerator, gen_name: str, animate: bool, braid_pct: float, show_trace: bool, random_endpoints: bool, mode: str = "CREATIVE", **kwargs):
         self.gen_name, self.braid_pct, self.grid, self.mode = gen_name, braid_pct, GridClass(rows, cols, levels), mode
         self.used_solution, self.used_map = False, False
+        self.adventure_slot = kwargs.get("adventure_slot", 1)
         self.show_fov = kwargs.get("dark_mode", False)
         self.fov_radius_cells = kwargs.get("fov_radius", 6.0)
         self.grid.mask_shape(shape)
@@ -478,4 +479,4 @@ class GameView(arcade.View):
             self.current_solver_idx = (self.current_solver_idx + 1) % len(self.solvers); self.update_hud()
             if self.show_solution and self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.player_cell, self.grid.get_cell(*self.end_pos))
         elif key == arcade.key.P: arcade.get_image().save("maze_export.png")
-        elif key == arcade.key.ESCAPE: self.window.show_view(MenuView())
+        elif key == arcade.key.ESCAPE: self.window.show_view(ProfileSelectView() if self.mode == "ADVENTURE" else CreativeMenuView())

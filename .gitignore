@@ -150,5 +150,7 @@ cython_debug/
 .vscode/
 
 # Game Data
-player_profile.json
+player_profile_1.json
+player_profile_2.json
+player_profile_3.json
 maze_export.png
