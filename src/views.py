@@ -270,8 +270,7 @@ class GameView(arcade.View):
                 if self.show_fov and self.fov_shapes:
                     # Raw OpenGL Stencil Masking
                     gl.glEnable(gl.GL_STENCIL_TEST)
-                    gl.glClearStencil(0)
-                    gl.glClear(gl.GL_STENCIL_BUFFER_BIT)
+                    gl.glClearStencil(0); gl.glClear(gl.GL_STENCIL_BUFFER_BIT)
                     
                     # 1. Mask Pass: Write 1s to stencil
                     gl.glStencilFunc(gl.GL_ALWAYS, 1, 0xFF)
@@ -282,15 +281,17 @@ class GameView(arcade.View):
                     
                     # 2. Render Pass: Only draw where stencil == 1
                     gl.glStencilFunc(gl.GL_EQUAL, 1, 0xFF)
-                    gl.glStencilOp(gl.GL_KEEP, gl.GL_KEEP, gl.GL_KEEP)
                     
-                    # Draw a faint light polygon to represent the floor illumination
-                    self.fov_shapes.draw()
-                    
+                    # Draw the 6-cell radial attenuation
+                    cx, cy = self.player_sprite.center_x, self.player_sprite.center_y
+                    step = self.renderer.cell_radius
+                    for i in range(6, 0, -1):
+                        alpha = int(100 * (1.0 - (i-1)/6))
+                        arcade.draw_circle_filled(cx, cy, i * step, (255, 255, 255, alpha // 4))
+
                     if len(self.wall_shapes_layers) > self.current_level: self.wall_shapes_layers[self.current_level].draw()
                     if len(self.stair_shapes_layers) > self.current_level: self.stair_shapes_layers[self.current_level].draw()
                     self._draw_maze_extras()
-                    
                     gl.glDisable(gl.GL_STENCIL_TEST)
                 else:
                     if len(self.wall_shapes_layers) > self.current_level: self.wall_shapes_layers[self.current_level].draw()
@@ -335,7 +336,8 @@ class GameView(arcade.View):
             self.scroll_to_player()
             if self.game_won: return
             if self.show_fov and self.player_sprite:
-                self.fov_shapes = self.renderer.create_fov_geometry((self.player_sprite.center_x, self.player_sprite.center_y), self.current_level, radius=250)
+                fov_rad = self.renderer.cell_radius * 6
+                self.fov_shapes = self.renderer.create_fov_geometry((self.player_sprite.center_x, self.player_sprite.center_y), self.current_level, radius=fov_rad)
             if self.solving and self.sol_iterator:
                 try: 
                     for _ in range(5): self.solution_path = next(self.sol_iterator)

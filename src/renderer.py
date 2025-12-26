@@ -33,7 +33,8 @@ class MazeRenderer:
         elif self.grid_type == "polar":
             rw = R * 1.5
             radius = (rw * 2) + r * rw + rw/2
-            angle = (c * (2 * math.pi / self.grid.columns)) - math.pi / 2
+            step = 2 * math.pi / self.grid.columns
+            angle = ((c + 0.5) * step) - math.pi / 2
             return ox + radius * math.cos(angle), oy + radius * math.sin(angle)
         else: # rect
             s = R * 2
@@ -113,7 +114,8 @@ class MazeRenderer:
                     edges = [(v1, v2, (-1, 0)), (v3, v4, (1, 0)), (v1, v4, (0, -1)), (v2, v3, (0, 1))]
 
                 for v1, v2, (dr, dc) in edges:
-                    n = self.grid.get_cell(r + dr, c + dc, level)
+                    target_c = (c + dc) % self.grid.columns if self.grid_type == "polar" else c + dc
+                    n = self.grid.get_cell(r + dr, target_c, level)
                     if not n or not cell.is_linked(n):
                         add_post(v1[0], v1[1]); add_post(v2[0], v2[1])
                         dx, dy = v2[0] - v1[0], v2[1] - v1[1]; dist = math.sqrt(dx*dx + dy*dy)
@@ -122,31 +124,30 @@ class MazeRenderer:
                             polygons.append([(v1[0]-nx, v1[1]-ny), (v1[0]+nx, v1[1]+ny), (v2[0]+nx, v2[1]+ny), (v2[0]-nx, v2[1]-ny)])
         return list(posts.values()) + polygons
 
-    def create_fov_geometry(self, origin: Tuple[float, float], level: int, radius: float = 350) -> arcade.shape_list.ShapeElementList:
-        """Low-Poly FOV generation using fixed-step raycasting for performance."""
+    def create_fov_geometry(self, origin: Tuple[float, float], level: int, radius: float = 300) -> arcade.shape_list.ShapeElementList:
+        """Low-Poly FOV with safety padding for thick walls and corner stability."""
         all_segments = self._get_segments(level)
-        active_segments, r2 = [], (radius * 1.1) ** 2
+        active_segments, r2 = [], (radius * 1.5) ** 2
+        T = self.cell_radius * (1.0 - self.inset_factor)
         
-        # Spatial culling remains to keep ray-segment tests minimal
         for p1, p2 in all_segments:
             d1, d2 = (p1[0]-origin[0])**2 + (p1[1]-origin[1])**2, (p2[0]-origin[0])**2 + (p2[1]-origin[1])**2
             if d1 < r2 or d2 < r2:
                 active_segments.append((p1, p2))
 
-        # Low-Poly: Fixed 90 rays (every 4 degrees)
         outer_points = []
-        for i in range(90):
-            angle = math.radians(i * 4)
+        for i in range(60):
+            angle = math.radians(i * 6)
             dx, dy, min_t = math.cos(angle), math.sin(angle), radius
             for p1, p2 in active_segments:
                 t = self._ray_segment_intersect(origin, (dx, dy), p1, p2)
-                if t is not None and t < min_t: min_t = t
+                if t is not None and t < min_t:
+                    min_t = t + (T * 0.4) # Push slightly into wall for watertight mask
             outer_points.append((origin[0] + dx * min_t, origin[1] + dy * min_t))
         
         shapes = arcade.shape_list.ShapeElementList()
         if len(outer_points) > 2:
-            # Alpha 40 provides a subtle floor 'glow' inside the stencil area
-            shapes.append(arcade.shape_list.create_polygon(outer_points, (255, 255, 255, 40)))
+            shapes.append(arcade.shape_list.create_polygon(outer_points, (255, 255, 255, 255)))
         return shapes
 
     def _ray_segment_intersect(self, or_pos, or_dir, p1, p2):
