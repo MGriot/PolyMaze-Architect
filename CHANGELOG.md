@@ -2,17 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v1.1.0] - 2025-12-25
+## [v1.2.0] - 2025-12-26
 
 ### Added
-- **Dynamic Field of View**: Implemented a new Raycasting-based lighting system.
-- **Stepped Attenuation**: Light now fades in distinct bands ("posterized" effect) as requested.
-- **Dark Mode Optimization**: Significant performance improvements for visibility calculations.
+- **Multi-Slot Profiles**: Support for 3 independent adventure profiles.
+- **Pre-Menu System**: New `MainMenuView` for branching between Adventure and Creative modes.
+- **Profile Management**: New `ProfileSelectView` to view stats and reset adventure progress.
+- **Expanded Creative Mode**: Added "Epic" and "Colossal" maze sizes.
+- **Dynamic FOV Difficulty**: In Adventure mode, FOV visibility radius now scales inversely with player level.
 
 ### Changed
-- **Refactored Renderer**: Moved visibility calculation logic from `views.py` to `renderer.py`.
-- **Lighting Algorithm**: Switched from per-frame brute-force segment checking to a sorted angle sweep algorithm ($O(N \log N)$).
+- **HUD Optimization**: Removed FPS counter from the main HUD for a cleaner look.
+- **Difficulty Balance**: Increased complexity ramp-up for large-scale grids.
 
 ### Fixed
-- **Frame Drops**: Resolved severe lag when using Dark Mode on large maps.
-- **Light Bleeding**: Fixed issues where light would pass through wall corners in specific topologies.
+- **Navigation Logic**: Improved ESC key behavior to return to appropriate sub-menus.
+- **Git Hygiene**: Added player profiles and exports to `.gitignore`.

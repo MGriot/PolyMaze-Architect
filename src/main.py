@@ -1,11 +1,11 @@
 # main.py
 import arcade
 import config
-from views import MenuView
+from views import MainMenuView
 
 def main():
     window = arcade.Window(config.SCREEN_WIDTH, config.SCREEN_HEIGHT, config.SCREEN_TITLE)
-    menu = MenuView()
+    menu = MainMenuView()
     window.show_view(menu)
     arcade.run()
 

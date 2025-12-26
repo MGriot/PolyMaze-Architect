@@ -19,11 +19,93 @@ from maze_algorithms import (
 from renderer import MazeRenderer
 from adventure_engine import AdventureEngine
 
-class MenuView(arcade.View):
+class MainMenuView(arcade.View):
     def __init__(self):
         super().__init__()
-        self.modes: List[str] = ["CREATIVE", "ADVENTURE"]
-        self.mode_idx: int = 0
+        self.options = ["ADVENTURE", "CREATIVE / TRAINING"]
+        self.selection = 0
+        self.title_text: Optional[arcade.Text] = None
+        self.option_texts: List[arcade.Text] = []
+
+    def on_show_view(self):
+        arcade.set_background_color(config.BG_COLOR)
+        cw, ch = config.SCREEN_WIDTH / 2, config.SCREEN_HEIGHT / 2
+        self.title_text = arcade.Text("POLY MAZE ARCHITECT", cw, ch + 150, config.TEXT_COLOR, font_size=40, anchor_x="center", bold=True)
+        self.update_ui()
+
+    def update_ui(self):
+        cw, ch = config.SCREEN_WIDTH / 2, config.SCREEN_HEIGHT / 2
+        self.option_texts = []
+        for i, opt in enumerate(self.options):
+            color = config.HIGHLIGHT_COLOR if i == self.selection else config.WALL_COLOR
+            text = f"> {opt} <" if i == self.selection else opt
+            self.option_texts.append(arcade.Text(text, cw, ch - (i * 60), color, font_size=24, anchor_x="center"))
+
+    def on_draw(self):
+        self.clear()
+        if self.title_text: self.title_text.draw()
+        for t in self.option_texts: t.draw()
+        arcade.draw_text("UP/DOWN: Select | ENTER: Confirm | ESC: Quit", config.SCREEN_WIDTH/2, 50, config.WALL_COLOR, font_size=12, anchor_x="center")
+
+    def on_key_press(self, key: int, modifiers: int):
+        if key == arcade.key.UP: self.selection = (self.selection - 1) % len(self.options); self.update_ui()
+        elif key == arcade.key.DOWN: self.selection = (self.selection + 1) % len(self.options); self.update_ui()
+        elif key == arcade.key.ENTER:
+            if self.selection == 0: self.window.show_view(ProfileSelectView())
+            else: self.window.show_view(CreativeMenuView())
+        elif key == arcade.key.ESCAPE: arcade.exit()
+
+class ProfileSelectView(arcade.View):
+    def __init__(self):
+        super().__init__()
+        self.slots = [1, 2, 3]
+        self.selection = 0
+        self.profiles_info = [AdventureEngine.get_profile_info(s) for s in self.slots]
+        self.title_text: Optional[arcade.Text] = None
+        self.slot_texts: List[arcade.Text] = []
+
+    def on_show_view(self):
+        arcade.set_background_color(config.BG_COLOR)
+        cw = config.SCREEN_WIDTH / 2
+        self.title_text = arcade.Text("SELECT ADVENTURE PROFILE", cw, config.SCREEN_HEIGHT - 100, config.TEXT_COLOR, font_size=30, anchor_x="center", bold=True)
+        self.update_ui()
+
+    def update_ui(self):
+        cw, ch = config.SCREEN_WIDTH / 2, config.SCREEN_HEIGHT / 2
+        self.slot_texts = []
+        for i, info in enumerate(self.profiles_info):
+            color = config.HIGHLIGHT_COLOR if i == self.selection else config.WALL_COLOR
+            y = ch + 80 - (i * 120)
+            status = f"LVL {info['level']} | EXP {info['exp']} | MAZES {info['total_mazes']}" if info['exists'] else "EMPTY SLOT"
+            prefix = "> " if i == self.selection else "  "
+            self.slot_texts.append(arcade.Text(f"{prefix}SLOT {i+1}", cw, y, color, font_size=20, anchor_x="center", bold=True))
+            self.slot_texts.append(arcade.Text(status, cw, y - 30, color, font_size=14, anchor_x="center"))
+
+    def on_draw(self):
+        self.clear()
+        if self.title_text: self.title_text.draw()
+        for t in self.slot_texts: t.draw()
+        arcade.draw_text("UP/DOWN: Select | ENTER: Play | DEL: Reset Slot | ESC: Back", config.SCREEN_WIDTH/2, 50, config.WALL_COLOR, font_size=12, anchor_x="center")
+
+    def on_key_press(self, key: int, modifiers: int):
+        if key == arcade.key.UP: self.selection = (self.selection - 1) % len(self.slots); self.update_ui()
+        elif key == arcade.key.DOWN: self.selection = (self.selection + 1) % len(self.slots); self.update_ui()
+        elif key == arcade.key.ESCAPE: self.window.show_view(MainMenuView())
+        elif key == arcade.key.ENTER:
+            engine = AdventureEngine(self.slots[self.selection])
+            params = engine.get_next_maze_params()
+            game = GameView()
+            game.setup(mode="ADVENTURE", adventure_slot=self.slots[self.selection], **params)
+            self.window.show_view(game)
+        elif key == arcade.key.DELETE:
+            path = f"player_profile_{self.slots[self.selection]}.json"
+            if os.path.exists(path): os.remove(path)
+            self.profiles_info[self.selection] = AdventureEngine.get_profile_info(self.slots[self.selection])
+            self.update_ui()
+
+class CreativeMenuView(arcade.View):
+    def __init__(self):
+        super().__init__()
         self.cell_types: List[Tuple[str, Type[Grid]]] = [("Square", SquareCellGrid), ("Hexagonal", HexCellGrid), ("Triangular", TriCellGrid), ("Polar", PolarCellGrid)]
         self.cell_idx: int = 0
         self.shapes: List[str] = ["rectangle", "circle", "triangle", "hexagon"]
@@ -52,29 +134,23 @@ class MenuView(arcade.View):
 
     def setup_ui(self):
         cw, ch = config.SCREEN_WIDTH / 2, config.SCREEN_HEIGHT / 2
-        self.title_text = arcade.Text("POLY MAZE ARCHITECT", cw, ch + 220, config.TEXT_COLOR, font_size=40, anchor_x="center")
+        self.title_text = arcade.Text("CREATIVE / TRAINING MODE", cw, ch + 220, config.TEXT_COLOR, font_size=30, anchor_x="center", bold=True)
         self.update_options()
 
     def update_options(self):
         cw, ch = config.SCREEN_WIDTH / 2, config.SCREEN_HEIGHT / 2
-        options = [f"MODE: {self.modes[self.mode_idx]} (Press TAB to switch)"]
-        if self.modes[self.mode_idx] == "CREATIVE":
-            options += [
-                f"G: Cell Shape -> {self.cell_types[self.cell_idx][0]}",
-                f"F: Maze Form -> {self.shapes[self.shape_idx].upper()}",
-                f"Z: Size -> {self.sizes[self.size_idx][0]}",
-                f"A: Algorithm -> {self.generators[self.gen_idx][0]}",
-                f"V: Animation -> {'ENABLED' if self.animate else 'DISABLED'}",
-                f"M: Multi-Path -> {'ON' if self.multi_path else 'OFF'}",
-                f"L: 3D Levels -> {self.levels}",
-            ]
-        else:
-            options += ["Difficulty will adapt to your skill.", "Complete mazes to level up.", "", "", "", "", ""]
-        options += [
+        options = [
+            f"G: Cell Shape -> {self.cell_types[self.cell_idx][0]}",
+            f"F: Maze Form -> {self.shapes[self.shape_idx].upper()}",
+            f"Z: Size -> {self.sizes[self.size_idx][0]}",
+            f"A: Algorithm -> {self.generators[self.gen_idx][0]}",
+            f"V: Animation -> {'ENABLED' if self.animate else 'DISABLED'}",
+            f"M: Multi-Path -> {'ON' if self.multi_path else 'OFF'}",
+            f"L: 3D Levels -> {self.levels}",
             f"E: Random Endpoints -> {'ON' if self.random_endpoints else 'OFF'}",
             f"R: Show Trace -> {'ON' if self.show_trace else 'OFF'}",
             f"T: Theme -> {config.CURRENT_THEME_NAME.upper()}",
-            "", "PRESS ENTER TO START", "PRESS ESC TO QUIT"
+            "", "PRESS ENTER TO START", "PRESS ESC TO BACK"
         ]
         self.option_texts = []
         for i, line in enumerate(options):
@@ -88,34 +164,30 @@ class MenuView(arcade.View):
             for text in self.option_texts: text.draw()
         except Exception: traceback.print_exc()
 
-    def on_key_press(self, key: int, modifiers: int):
+    def on_key_press(self):
         changed = True
-        if key == arcade.key.TAB: self.mode_idx = (self.mode_idx + 1) % len(self.modes)
-        elif key == arcade.key.G and self.modes[self.mode_idx] == "CREATIVE": self.cell_idx = (self.cell_idx + 1) % len(self.cell_types)
-        elif key == arcade.key.F and self.modes[self.mode_idx] == "CREATIVE": self.shape_idx = (self.shape_idx + 1) % len(self.shapes)
-        elif key == arcade.key.Z and self.modes[self.mode_idx] == "CREATIVE": self.size_idx = (self.size_idx + 1) % len(self.sizes)
-        elif key == arcade.key.A and self.modes[self.mode_idx] == "CREATIVE": self.gen_idx = (self.gen_idx + 1) % len(self.generators)
-        elif key == arcade.key.V and self.modes[self.mode_idx] == "CREATIVE": self.animate = not self.animate
-        elif key == arcade.key.M and self.modes[self.mode_idx] == "CREATIVE": self.multi_path = not self.multi_path
-        elif key == arcade.key.L and self.modes[self.mode_idx] == "CREATIVE": self.levels = (self.levels % 4) + 1
+        if key == arcade.key.G: self.cell_idx = (self.cell_idx + 1) % len(self.cell_types)
+        elif key == arcade.key.F: self.shape_idx = (self.shape_idx + 1) % len(self.shapes)
+        elif key == arcade.key.Z: self.size_idx = (self.size_idx + 1) % len(self.sizes)
+        elif key == arcade.key.A: self.gen_idx = (self.gen_idx + 1) % len(self.generators)
+        elif key == arcade.key.V: self.animate = not self.animate
+        elif key == arcade.key.M: self.multi_path = not self.multi_path
+        elif key == arcade.key.L: self.levels = (self.levels % 6) + 1
         elif key == arcade.key.E: self.random_endpoints = not self.random_endpoints
         elif key == arcade.key.R: self.show_trace = not self.show_trace
         elif key == arcade.key.T:
             config.apply_theme("light" if config.CURRENT_THEME_NAME == "dark" else "dark")
             arcade.set_background_color(config.BG_COLOR); self.setup_ui()
         elif key == arcade.key.ENTER: self.start_game(); changed = False
-        elif key == arcade.key.ESCAPE: arcade.exit(); changed = False
+        elif key == arcade.key.ESCAPE: self.window.show_view(MainMenuView()); changed = False
         else: changed = False
         if changed: self.update_options()
 
     def start_game(self):
-        game = GameView(); mode = self.modes[self.mode_idx]
-        if mode == "ADVENTURE":
-            engine = AdventureEngine(); params = engine.get_next_maze_params(); game.setup(mode=mode, **params)
-        else:
-            _, GridClass = self.cell_types[self.cell_idx]; shape = self.shapes[self.shape_idx]; _, rows, cols = self.sizes[self.size_idx]
-            gen_name, GenClass = self.generators[self.gen_idx]
-            game.setup(GridClass, shape, rows, cols, self.levels, GenClass(), gen_name, self.animate, 0.5 if self.multi_path else 0.0, self.show_trace, self.random_endpoints, mode=mode)
+        game = GameView(); mode = "CREATIVE"
+        _, GridClass = self.cell_types[self.cell_idx]; shape = self.shapes[self.shape_idx]; _, rows, cols = self.sizes[self.size_idx]
+        gen_name, GenClass = self.generators[self.gen_idx]
+        game.setup(GridClass, shape, rows, cols, self.levels, GenClass(), gen_name, self.animate, 0.5 if self.multi_path else 0.0, self.show_trace, self.random_endpoints, mode=mode)
         self.window.show_view(game)
 
 class GameView(arcade.View):
@@ -141,11 +213,18 @@ class GameView(arcade.View):
         self.start_pos: Tuple[int, int, int] = (0,0,0); self.end_pos: Tuple[int, int, int] = (0,0,0)
         self.step_count: int = 0; self.start_time: float = 0; self.solve_duration: float = 0
         self.mode: str = "CREATIVE"; self.used_solution: bool = False; self.used_map: bool = False
+        self.adventure_slot: int = 1
         self.maze_camera = arcade.camera.Camera2D(); self.gui_camera = arcade.camera.Camera2D()
 
     def setup(self, GridClass: Type[Grid], shape: str, rows: int, cols: int, levels: int, generator: MazeGenerator, gen_name: str, animate: bool, braid_pct: float, show_trace: bool, random_endpoints: bool, mode: str = "CREATIVE", **kwargs):
         self.gen_name, self.braid_pct, self.grid, self.mode = gen_name, braid_pct, GridClass(rows, cols, levels), mode
         self.used_solution, self.used_map = False, False
+<<<<<<< Updated upstream
+=======
+        self.adventure_slot = kwargs.get("adventure_slot", 1)
+        self.show_fov = kwargs.get("dark_mode", False)
+        self.fov_radius_cells = kwargs.get("fov_radius", 6.0)
+>>>>>>> Stashed changes
         self.grid.mask_shape(shape)
         rad = 45; gtype = "hex" if GridClass == HexCellGrid else ("tri" if GridClass == TriCellGrid else ("polar" if GridClass == PolarCellGrid else "rect"))
         self.renderer = MazeRenderer(self.grid, rad, gtype, self.top_margin, self.bottom_margin)
@@ -246,7 +325,7 @@ class GameView(arcade.View):
         arcade.draw_text("CONGRATULATIONS!", cw, ch+120, config.HIGHLIGHT_COLOR, font_size=36, anchor_x="center", bold=True)
         lines, msg = [f"Time: {int(self.solve_duration)}s", f"Cells Visited: {len(self.cells_visited)}"], "PRESS ENTER TO RESTART"
         if self.mode == "ADVENTURE":
-            engine = AdventureEngine(); level, exp, total = engine.data["skill_level"], engine.data["exp"], engine.data["total_mazes"]
+            engine = AdventureEngine(self.adventure_slot); level, exp, total = engine.data["skill_level"], engine.data["exp"], engine.data["total_mazes"]
             lines.append(f"ADVENTURE LVL: {level}"); lines.append(f"TOTAL EXP: {exp}"); lines.append(f"MAZES SOLVED: {total}"); msg = f"LEVEL COMPLETE! PRESS ENTER FOR NEXT CHALLENGE"
         lines.append(""); lines.append(msg)
         for i, line in enumerate(lines): arcade.draw_text(line, cw, ch+40-i*30, config.HIGHLIGHT_COLOR if "ENTER" in line else config.TEXT_COLOR, font_size=16, anchor_x="center")
@@ -325,10 +404,10 @@ class GameView(arcade.View):
         if self.generating or (self.game_won and key != arcade.key.ENTER): return
         if self.game_won and key == arcade.key.ENTER:
             if self.mode == "ADVENTURE":
-                engine = AdventureEngine(); diff = self.grid.levels * (self.grid.rows * self.grid.columns // 100)
+                engine = AdventureEngine(self.adventure_slot); diff = self.grid.levels * (self.grid.rows * self.grid.columns // 100)
                 engine.process_result(self.solve_duration, self.step_count, self.used_solution, self.used_map, int(diff))
-                params = engine.get_next_maze_params(); game = GameView(); game.setup(mode="ADVENTURE", **params); self.window.show_view(game)
-            else: self.window.show_view(MenuView())
+                params = engine.get_next_maze_params(); game = GameView(); game.setup(mode="ADVENTURE", adventure_slot=self.adventure_slot, **params); self.window.show_view(game)
+            else: self.window.show_view(CreativeMenuView())
             return
         if key == arcade.key.M: self.show_map = not self.show_map; self.used_map = True if self.show_map else self.used_map; return
         if key == arcade.key.X:
@@ -362,4 +441,8 @@ class GameView(arcade.View):
             self.current_solver_idx = (self.current_solver_idx + 1) % len(self.solvers); self.update_hud()
             if self.show_solution and self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.player_cell, self.grid.get_cell(*self.end_pos))
         elif key == arcade.key.P: arcade.get_image().save("maze_export.png")
+<<<<<<< Updated upstream
         elif key == arcade.key.ESCAPE: self.window.show_view(MenuView())
+=======
+        elif key == arcade.key.ESCAPE: self.window.show_view(ProfileSelectView() if self.mode == "ADVENTURE" else CreativeMenuView())
+>>>>>>> Stashed changes

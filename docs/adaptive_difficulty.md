@@ -32,8 +32,9 @@ The engine adjusts the following variables to increase difficulty:
    - *Complex (Long Corridors):* Recursive Backtracker, Wilson's.
 
 ## 4. Implementation Strategy
-- **Persistence:** Skill Level is saved in `player_profile.json`.
+- **Persistence:** Progress is stored across three independent slots (`player_profile_1.json`, etc.).
 - **Adventure Engine:** A dedicated class (`AdventureEngine`) calculates the next maze's parameters by mapping the current Skill Level to the parameter ranges defined in a difficulty matrix.
+- **Profile Selection:** Players can manage multiple careers simultaneously, with the ability to reset progress for any specific slot.
 - **Progression:** 
   - **Win:** Level +1.
   - **Perfect Win (No tools, fast):** Level +2.

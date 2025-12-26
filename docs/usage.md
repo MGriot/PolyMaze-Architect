@@ -1,10 +1,24 @@
 # User Guide & Controls
 
 ## Main Menu
+- **ADVENTURE**: Progress through an adaptive challenge.
+- **CREATIVE / TRAINING**: Customize every aspect of the maze.
+
+## Profile Selection (Adventure Mode)
+- **UP/DOWN**: Select between **3 Profile Slots**.
+- **ENTER**: Play with the selected profile.
+- **DEL**: Reset/Overwrite the selected profile.
+- **ESC**: Return to Main Menu.
+
+## Creative / Training Setup
 Navigate using the following keys:
 - **G**: Cycle Cell Topology (**Square, Hexagonal, Triangular, Polar**).
 - **F**: Cycle Maze Form (**Rectangle, Circle, Triangle, Hexagon**).
+<<<<<<< Updated upstream
 - **Z**: Cycle Maze Size (Small, Medium, Large).
+=======
+- **Z**: Cycle Maze Size (Small to Colossal).
+>>>>>>> Stashed changes
 - **A**: Cycle Generation Algorithm (10 available).
 - **L**: Set number of **3D Levels** (up to 4 floors).
 - **M**: Toggle **Multi-Path** (Braided) mode.
@@ -13,6 +27,7 @@ Navigate using the following keys:
 - **R**: Toggle **Trace** (Breadcrumbs).
 - **T**: Toggle **Dark/Light** theme.
 - **ENTER**: Begin Architecting.
+- **ESC**: Return to Main Menu.
 
 ## Exploration (In-Game)
 - **WASD / Arrow Keys**: Discrete, cell-based movement with spatial alignment.
@@ -23,7 +38,7 @@ Navigate using the following keys:
 - **TAB**: Change the AI solver algorithm (BFS, DFS, A*).
 - **M**: Toggle **Architectural Map** (Vertical exploded view).
 - **P**: **Print** (Save current view as PNG).
-- **ESC**: Back to Menu.
+- **ESC**: Back to Menu (Profile Select or Creative Setup).
 
 ## The HUD (Heads-Up Display)
 The HUD bar at the top provides real-time information:

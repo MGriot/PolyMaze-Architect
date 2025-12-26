@@ -10,9 +10,26 @@ from maze_algorithms import (
 )
 
 class AdventureEngine:
-    def __init__(self, profile_path: str = "player_profile.json"):
-        self.profile_path = profile_path
+    def __init__(self, slot: int = 1):
+        self.slot = slot
+        self.profile_path = f"player_profile_{slot}.json"
         self.data = self.load_profile()
+
+    @staticmethod
+    def get_profile_info(slot: int) -> Dict[str, Any]:
+        path = f"player_profile_{slot}.json"
+        if os.path.exists(path):
+            try:
+                with open(path, "r") as f:
+                    data = json.load(f)
+                    return {
+                        "exists": True,
+                        "level": data.get("skill_level", 1),
+                        "exp": data.get("exp", 0),
+                        "total_mazes": data.get("total_mazes", 0)
+                    }
+            except Exception: pass
+        return {"exists": False, "level": 1, "exp": 0, "total_mazes": 0}
 
     def load_profile(self) -> Dict[str, Any]:
         if os.path.exists(self.profile_path):
