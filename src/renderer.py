@@ -2,6 +2,7 @@
 import arcade
 import math
 import config
+from typing import Tuple
 from maze_topology import Grid
 
 class MazeRenderer:
@@ -84,15 +85,6 @@ class MazeRenderer:
                 if not n_side or not cell.is_linked(n_side): segments.append(((ox + ir*math.cos(ts), oy + ir*math.sin(ts)), (ox + or_*math.cos(ts), oy + or_*math.sin(ts))))
         return segments
 
-    def get_nearby_vertices(self, level: int, px: float, py: float, radius: float):
-        vertices = set()
-        segments = self.get_wall_segments(level)
-        r_sq = radius ** 2
-        for p1, p2 in segments:
-            if (p1[0]-px)**2 + (p1[1]-py)**2 < r_sq: vertices.add(p1)
-            if (p2[0]-px)**2 + (p2[1]-py)**2 < r_sq: vertices.add(p2)
-        return list(vertices)
-
     def create_wall_shapes(self, level: int, scale=1.0, offset=(0,0), thickness_mult=1.0):
         shapes = arcade.shape_list.ShapeElementList()
         processed = set()
@@ -151,3 +143,19 @@ class MazeRenderer:
         if wid in processed: return
         processed.add(wid)
         shapes.append(arcade.shape_list.create_line(p1[0], p1[1], p2[0], p2[1], config.WALL_COLOR, thickness))
+
+    def get_maze_size(self) -> Tuple[float, float]:
+        R = self.cell_radius
+        if self.grid_type == "hex":
+            w, h = math.sqrt(3) * R, 1.5 * R
+            return (self.grid.columns + 0.5) * w, (self.grid.rows - 1) * h + 2 * R
+        elif self.grid_type == "tri":
+            s = R * math.sqrt(3)
+            return (self.grid.columns + 1) * (s/2), self.grid.rows * 1.5 * R + 0.5 * R
+        elif self.grid_type == "polar":
+            rw = R * 1.5
+            max_r = (rw * 2) + self.grid.rows * rw
+            return max_r * 2, max_r * 2
+        else: # rect
+            s = R * 2
+            return self.grid.columns * s, self.grid.rows * s

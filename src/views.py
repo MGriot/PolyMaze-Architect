@@ -42,7 +42,7 @@ class MenuView(arcade.View):
         self.multi_path: bool = False
         self.levels: int = 1
         self.show_trace: bool = True
-        self.random_endpoints: bool = False
+        self.random_endpoints: bool = True
         self.title_text: Optional[arcade.Text] = None
         self.option_texts: List[arcade.Text] = []
 
@@ -58,7 +58,6 @@ class MenuView(arcade.View):
     def update_options(self):
         cw, ch = config.SCREEN_WIDTH / 2, config.SCREEN_HEIGHT / 2
         options = [f"MODE: {self.modes[self.mode_idx]} (Press TAB to switch)"]
-        
         if self.modes[self.mode_idx] == "CREATIVE":
             options += [
                 f"G: Cell Shape -> {self.cell_types[self.cell_idx][0]}",
@@ -70,12 +69,7 @@ class MenuView(arcade.View):
                 f"L: 3D Levels -> {self.levels}",
             ]
         else:
-            options += [
-                "Difficulty will adapt to your skill.",
-                "Complete mazes to level up.",
-                "", "", "", "", ""
-            ]
-
+            options += ["Difficulty will adapt to your skill.", "Complete mazes to level up.", "", "", "", "", ""]
         options += [
             f"E: Random Endpoints -> {'ON' if self.random_endpoints else 'OFF'}",
             f"R: Show Trace -> {'ON' if self.show_trace else 'OFF'}",
@@ -115,19 +109,13 @@ class MenuView(arcade.View):
         if changed: self.update_options()
 
     def start_game(self):
-        game = GameView()
-        mode = self.modes[self.mode_idx]
-        
+        game = GameView(); mode = self.modes[self.mode_idx]
         if mode == "ADVENTURE":
-            engine = AdventureEngine()
-            params = engine.get_next_maze_params()
-            game.setup(mode=mode, **params)
+            engine = AdventureEngine(); params = engine.get_next_maze_params(); game.setup(mode=mode, **params)
         else:
-            _, GridClass = self.cell_types[self.cell_idx]
-            shape = self.shapes[self.shape_idx]; _, rows, cols = self.sizes[self.size_idx]
+            _, GridClass = self.cell_types[self.cell_idx]; shape = self.shapes[self.shape_idx]; _, rows, cols = self.sizes[self.size_idx]
             gen_name, GenClass = self.generators[self.gen_idx]
             game.setup(GridClass, shape, rows, cols, self.levels, GenClass(), gen_name, self.animate, 0.5 if self.multi_path else 0.0, self.show_trace, self.random_endpoints, mode=mode)
-        
         self.window.show_view(game)
 
 class GameView(arcade.View):
@@ -153,26 +141,16 @@ class GameView(arcade.View):
         self.start_pos: Tuple[int, int, int] = (0,0,0); self.end_pos: Tuple[int, int, int] = (0,0,0)
         self.step_count: int = 0; self.start_time: float = 0; self.solve_duration: float = 0
         self.mode: str = "CREATIVE"; self.used_solution: bool = False; self.used_map: bool = False
-        self.dark_mode: bool = False; self.shadow_texture: Optional[arcade.Texture] = None
-        
-        # Cameras for Arcade 3.x
-        self.maze_camera = arcade.camera.Camera2D()
-        self.gui_camera = arcade.camera.Camera2D()
+        self.maze_camera = arcade.camera.Camera2D(); self.gui_camera = arcade.camera.Camera2D()
 
-    def setup(self, GridClass: Type[Grid], shape: str, rows: int, cols: int, levels: int, generator: MazeGenerator, gen_name: str, animate: bool, braid_pct: float, show_trace: bool, random_endpoints: bool, mode: str = "CREATIVE", dark_mode: bool = False):
-        self.gen_name, self.braid_pct, self.grid, self.mode, self.dark_mode = gen_name, braid_pct, GridClass(rows, cols, levels), mode, dark_mode
+    def setup(self, GridClass: Type[Grid], shape: str, rows: int, cols: int, levels: int, generator: MazeGenerator, gen_name: str, animate: bool, braid_pct: float, show_trace: bool, random_endpoints: bool, mode: str = "CREATIVE", **kwargs):
+        self.gen_name, self.braid_pct, self.grid, self.mode = gen_name, braid_pct, GridClass(rows, cols, levels), mode
         self.used_solution, self.used_map = False, False
         self.grid.mask_shape(shape)
-        if GridClass == HexCellGrid: gtype = "hex"
-        elif GridClass == TriCellGrid: gtype = "tri"
-        elif GridClass == PolarCellGrid: gtype = "polar"
-        else: gtype = "rect"
-        
-        rad = 45
+        rad = 45; gtype = "hex" if GridClass == HexCellGrid else ("tri" if GridClass == TriCellGrid else ("polar" if GridClass == PolarCellGrid else "rect"))
         self.renderer = MazeRenderer(self.grid, rad, gtype, self.top_margin, self.bottom_margin)
         self.show_trace, self.current_level, self.path_history, self.solution_path, self.show_map, self.game_won = show_trace, 0, [], [], False, False
         self.cells_visited, self.player_list, self.grid_shapes, self.step_count = set(), arcade.SpriteList(), arcade.shape_list.ShapeElementList(), 0
-        
         for cell in self.grid.each_cell():
             if cell.level == 0:
                 cx, cy = self.renderer.get_pixel(cell.row, cell.column)
@@ -180,53 +158,44 @@ class GameView(arcade.View):
                 elif gtype == "tri": pts = self.renderer.get_tri_verts(cell.row, cell.column, cx, cy, rad)
                 else: pts = [(cx-rad, cy-rad), (cx+rad, cy-rad), (cx+rad, cy+rad), (cx-rad, cy+rad)]
                 self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (60, 60, 60), 1))
-        
         self.setup_ui_text(); valid_cells = list(self.grid.each_cell())
         if valid_cells:
             if random_endpoints:
                 s_c = random.choice(valid_cells); e_c = random.choice(valid_cells)
-                if len(valid_cells) > 1:
-                    while e_c == s_c: e_c = random.choice(valid_cells)
-                self.start_pos = (s_c.row, s_c.column, s_c.level); self.end_pos = (e_c.row, e_c.column, e_c.level)
+                while e_c == s_c and len(valid_cells)>1: e_c = random.choice(valid_cells)
+                self.start_pos, self.end_pos = (s_c.row, s_c.column, s_c.level), (e_c.row, e_c.column, e_c.level)
             else:
                 valid_cells.sort(key=lambda c: (c.level, c.row, c.column))
-                s_c, e_c = valid_cells[0], valid_cells[-1]
-                self.start_pos = (s_c.row, s_c.column, s_c.level); self.end_pos = (e_c.row, e_c.column, e_c.level)
+                s_c, e_c = valid_cells[0], valid_cells[-1]; self.start_pos, self.end_pos = (s_c.row, s_c.column, s_c.level), (e_c.row, e_c.column, e_c.level)
+        gx, gy = self.renderer.get_pixel(self.grid.rows//2, self.grid.columns//2); self.maze_camera.position = (gx, gy)
         
-        mid_r, mid_c = self.grid.rows // 2, self.grid.columns // 2
-        gx, gy = self.renderer.get_pixel(mid_r, mid_c)
-        self.maze_camera.position = (gx, gy)
-
+        # Adaptive Zoom Logic
+        maze_w, maze_h = self.renderer.get_maze_size()
+        avail_w = config.SCREEN_WIDTH * 0.9
+        avail_h = (config.SCREEN_HEIGHT - self.top_margin - self.bottom_margin) * 0.9
+        self.maze_camera.zoom = min(avail_w / maze_w, avail_h / maze_h, 1.5)
+        
         if animate: self.generating, self.gen_iterator = True, generator.generate_step(self.grid)
-        else:
-            generator.generate(self.grid)
-            if self.braid_pct > 0: self.grid.braid(self.braid_pct)
-            self.finish_generation()
+        else: generator.generate(self.grid); self.finish_generation()
 
     def setup_ui_text(self):
-        self.hud_text_1 = arcade.Text("", 20, config.SCREEN_HEIGHT - 25, config.TEXT_COLOR, font_size=12, bold=True)
-        self.hud_text_2 = arcade.Text("WASD: Move | X: Sol | R: Trace | V: Vision | +/-: Zoom | 0: Reset | M: Map | ESC: Menu", 20, config.SCREEN_HEIGHT - 65, config.WALL_COLOR, font_size=10)
-        self.hud_stats = arcade.Text("", config.SCREEN_WIDTH - 20, config.SCREEN_HEIGHT - 25, config.HIGHLIGHT_COLOR, font_size=12, anchor_x="right", bold=True)
+        self.hud_text_1 = arcade.Text("", 20, config.SCREEN_HEIGHT-25, config.TEXT_COLOR, font_size=12, bold=True)
+        self.hud_text_2 = arcade.Text("WASD: Move | X: Sol | R: Trace | +/-: Zoom | 0: Reset | M: Map | ESC: Menu", 20, config.SCREEN_HEIGHT-65, config.WALL_COLOR, font_size=10)
+        self.hud_stats = arcade.Text("", config.SCREEN_WIDTH-20, config.SCREEN_HEIGHT-25, config.HIGHLIGHT_COLOR, font_size=12, anchor_x="right", bold=True)
         self.status_text = arcade.Text("GENERATING...", config.SCREEN_WIDTH/2, 30, config.TEXT_COLOR, font_size=16, anchor_x="center")
-        self.stair_prompt = arcade.Text("", config.SCREEN_WIDTH/2, 30, arcade.color.CYAN, font_size=18, anchor_x="center", bold=True)
-        self.update_hud()
+        self.stair_prompt = arcade.Text("", config.SCREEN_WIDTH/2, 30, arcade.color.CYAN, font_size=18, anchor_x="center", bold=True); self.update_hud()
 
     def update_hud(self):
         if not self.grid: return
-        l_str = f"Floor {self.current_level+1}/{self.grid.levels}"
-        z_str = f"Zoom: {self.maze_camera.zoom:.1f}x"
-        t_spent = int(time.time() - self.start_time) if not self.game_won else int(self.solve_duration)
-        fps = arcade.get_fps()
+        l_str, z_str = f"Floor {self.current_level+1}/{self.grid.levels}", f"Zoom: {self.maze_camera.zoom:.1f}x"
+        t_spent = int(time.time()-self.start_time) if not self.game_won else int(self.solve_duration)
         if self.hud_text_1: self.hud_text_1.text = f"{self.gen_name.upper()} ARCHITECT | {l_str}"
-        if self.hud_stats: self.hud_stats.text = f"STEPS: {self.step_count} | TIME: {t_spent}s | {z_str} | FPS: {int(fps)}"
+        if self.hud_stats: self.hud_stats.text = f"STEPS: {self.step_count} | TIME: {t_spent}s | {z_str} | FPS: {int(arcade.get_fps())}"
 
     def scroll_to_player(self, instant=False):
         if not self.player_sprite: return
         if instant: self.maze_camera.position = (self.player_sprite.center_x, self.player_sprite.center_y)
-        else:
-            curr_x, curr_y = self.maze_camera.position
-            dest_x, dest_y = self.player_sprite.center_x, self.player_sprite.center_y
-            self.maze_camera.position = (curr_x + (dest_x - curr_x) * 0.1, curr_y + (dest_y - curr_y) * 0.1)
+        else: cx, cy = self.maze_camera.position; self.maze_camera.position = (cx+(self.player_sprite.center_x-cx)*0.1, cy+(self.player_sprite.center_y-cy)*0.1)
 
     def finish_generation(self):
         try:
@@ -234,11 +203,9 @@ class GameView(arcade.View):
             self.generating = False; self.wall_shapes_layers = [self.renderer.create_wall_shapes(l) for l in range(self.grid.levels)]
             self.stair_shapes_layers = [self.renderer.create_stair_shapes(l) for l in range(self.grid.levels)]; self.generate_map_shapes()
             sr, sc, sl = self.start_pos; self.player_cell = self.grid.get_cell(sr, sc, sl); px, py = self.renderer.get_pixel(sr, sc)
-            rad = int(self.renderer.cell_radius * 0.3)
-            self.player_sprite = arcade.Sprite(); self.player_sprite.texture = arcade.make_circle_texture(rad * 2, config.PLAYER_COLOR)
+            self.player_sprite = arcade.Sprite(); self.player_sprite.texture = arcade.make_circle_texture(int(self.renderer.cell_radius*0.6), config.PLAYER_COLOR)
             self.player_sprite.center_x, self.player_sprite.center_y = px, py; self.player_list.append(self.player_sprite)
-            self.target_pos, self.path_history, self.start_time, self.cells_visited = (px, py), [((sr, sc), sl)], time.time(), set([(sr, sc, sl)])
-            self.update_hud(); self.scroll_to_player(True)
+            self.target_pos, self.path_history, self.start_time, self.cells_visited = (px, py), [((sr, sc), sl)], time.time(), set([(sr, sc, sl)]); self.update_hud(); self.scroll_to_player(True)
         except Exception: traceback.print_exc()
 
     def generate_map_shapes(self):
@@ -246,48 +213,50 @@ class GameView(arcade.View):
         self.map_stair_shapes = [self.renderer.create_stair_shapes(l, scale=0.35, offset=(0, (l-(self.grid.levels-1)/2)*config.SCREEN_HEIGHT*0.22)) for l in range(self.grid.levels)]
 
     def draw_map_overlay(self):
-        arcade.draw_lbwh_rectangle_filled(0, 0, config.SCREEN_WIDTH, config.SCREEN_HEIGHT, (0,0,0,235))
-        arcade.draw_text("EXPLODED ARCHITECTURAL VIEW", config.SCREEN_WIDTH/2, config.SCREEN_HEIGHT-40, arcade.color.CYAN, font_size=20, anchor_x="center", bold=True)
+        overlay_color = config.BG_COLOR + (235,)
+        arcade.draw_lbwh_rectangle_filled(0, 0, config.SCREEN_WIDTH, config.SCREEN_HEIGHT, overlay_color)
+        arcade.draw_text("EXPLODED ARCHITECTURAL VIEW", config.SCREEN_WIDTH/2, config.SCREEN_HEIGHT-40, config.HIGHLIGHT_COLOR, font_size=20, anchor_x="center", bold=True)
         for l in range(self.grid.levels):
-            off = (0, (l-(self.grid.levels-1)/2)*config.SCREEN_HEIGHT*0.22); p_center = self.renderer.get_pixel(self.grid.rows//2, self.grid.columns//2, 0.35, off)
-            arcade.draw_lbwh_rectangle_filled(p_center[0]-200, p_center[1]-150, 400, 300, (50, 50, 50, 100))
-            self.map_wall_shapes[l].draw(); self.map_stair_shapes[l].draw()
+            off = (0, (l-(self.grid.levels-1)/2)*config.SCREEN_HEIGHT*0.22); pc = self.renderer.get_pixel(self.grid.rows//2, self.grid.columns//2, 0.35, off)
+            # Use a slightly contrasting box for each level
+            box_color = (128, 128, 128, 100) if config.CURRENT_THEME_NAME == "dark" else (200, 200, 200, 100)
+            arcade.draw_lbwh_rectangle_filled(pc[0]-200, pc[1]-150, 400, 300, box_color); self.map_wall_shapes[l].draw(); self.map_stair_shapes[l].draw()
             if self.show_solution and self.solution_path:
-                pts = [self.renderer.get_pixel(r, c, 0.35, off) for r, c, lv in self.solution_path if lv == l]
-                if len(pts) > 1: arcade.draw_line_strip(pts, self.solvers[self.current_solver_idx][2], 2)
-            if self.show_trace and len(self.path_history) > 1:
-                pts = [self.renderer.get_pixel(r, c, 0.35, off) for (r, c), lv in self.path_history if lv == l]
-                if len(pts) > 1: arcade.draw_line_strip(pts, config.PATH_TRACE_COLOR, 1)
-            if l == self.start_pos[2]: px, py = self.renderer.get_pixel(self.start_pos[0], self.start_pos[1], 0.35, off); arcade.draw_circle_filled(px, py, 4, arcade.color.WHITE)
-            if l == self.end_pos[2]: px, py = self.renderer.get_pixel(self.end_pos[0], self.end_pos[1], 0.35, off); arcade.draw_circle_filled(px, py, 4, config.GOAL_COLOR)
-            if l == self.current_level and self.player_cell: px, py = self.renderer.get_pixel(self.player_cell.row, self.player_cell.column, 0.35, off); arcade.draw_circle_filled(px, py, 5, config.PLAYER_COLOR)
+                pts = [self.renderer.get_pixel(r,c,0.35,off) for r,c,lv in self.solution_path if lv==l]
+                if len(pts)>1: 
+                    sol_colors = [config.COLOR_SOL_BFS, config.COLOR_SOL_DFS, config.COLOR_SOL_ASTAR]
+                    arcade.draw_line_strip(pts, sol_colors[self.current_solver_idx], 2)
+            if self.show_trace and len(self.path_history)>1:
+                pts = [self.renderer.get_pixel(r,c,0.35,off) for (r,c),lv in self.path_history if lv==l]
+                if len(pts)>1: arcade.draw_line_strip(pts, config.PATH_TRACE_COLOR, 1)
+            if l==self.start_pos[2]: px,py = self.renderer.get_pixel(self.start_pos[0],self.start_pos[1],0.35,off); arcade.draw_circle_filled(px,py,4,config.TEXT_COLOR)
+            if l==self.end_pos[2]: px,py = self.renderer.get_pixel(self.end_pos[0],self.end_pos[1],0.35,off); arcade.draw_circle_filled(px,py,4,config.GOAL_COLOR)
+            if l==self.current_level and self.player_cell: px,py = self.renderer.get_pixel(self.player_cell.row,self.player_cell.column,0.35,off); arcade.draw_circle_filled(px,py,5,config.PLAYER_COLOR)
 
     def draw_minimap(self):
         if self.grid.levels <= 1: return
-        x, y = config.SCREEN_WIDTH-40, config.SCREEN_HEIGHT-100; arcade.draw_lbwh_rectangle_filled(x-30, y-60, 60, 120, (0,0,0,120))
-        for i in range(self.grid.levels):
-            color = arcade.color.CYAN if i == self.current_level else (100, 100, 100, 150)
-            arcade.draw_lbwh_rectangle_filled(x-20, y-50+i*25, 40, 20, color)
+        x, y = config.SCREEN_WIDTH-40, config.SCREEN_HEIGHT-100; 
+        bg_color = config.BG_COLOR + (120,)
+        arcade.draw_lbwh_rectangle_filled(x-30, y-60, 60, 120, bg_color)
+        for i in range(self.grid.levels): arcade.draw_lbwh_rectangle_filled(x-20, y-50+i*25, 40, 20, config.HIGHLIGHT_COLOR if i == self.current_level else (128, 128, 128, 150))
 
     def draw_victory(self):
-        arcade.draw_lbwh_rectangle_filled(0, 0, config.SCREEN_WIDTH, config.SCREEN_HEIGHT, (0,0,0,200)); cw, ch = config.SCREEN_WIDTH/2, config.SCREEN_HEIGHT/2
-        arcade.draw_text("CONGRATULATIONS!", cw, ch+120, arcade.color.GOLD, font_size=36, anchor_x="center", bold=True)
-        lines = [f"Time: {int(self.solve_duration)}s", f"Cells Visited: {len(self.cells_visited)}"]
-        msg = "PRESS ENTER TO RESTART"
+        overlay_color = config.BG_COLOR + (230,)
+        arcade.draw_lbwh_rectangle_filled(0, 0, config.SCREEN_WIDTH, config.SCREEN_HEIGHT, overlay_color); cw, ch = config.SCREEN_WIDTH/2, config.SCREEN_HEIGHT/2
+        arcade.draw_text("CONGRATULATIONS!", cw, ch+120, config.HIGHLIGHT_COLOR, font_size=36, anchor_x="center", bold=True)
+        lines, msg = [f"Time: {int(self.solve_duration)}s", f"Cells Visited: {len(self.cells_visited)}"], "PRESS ENTER TO RESTART"
         if self.mode == "ADVENTURE":
             engine = AdventureEngine(); level, exp, total = engine.data["skill_level"], engine.data["exp"], engine.data["total_mazes"]
             lines.append(f"ADVENTURE LVL: {level}"); lines.append(f"TOTAL EXP: {exp}"); lines.append(f"MAZES SOLVED: {total}"); msg = f"LEVEL COMPLETE! PRESS ENTER FOR NEXT CHALLENGE"
         lines.append(""); lines.append(msg)
-        for i, line in enumerate(lines): 
-            color = config.HIGHLIGHT_COLOR if "ENTER" in line else config.TEXT_COLOR
-            arcade.draw_text(line, cw, ch+40-i*30, color, font_size=16, anchor_x="center")
+        for i, line in enumerate(lines): arcade.draw_text(line, cw, ch+40-i*30, config.HIGHLIGHT_COLOR if "ENTER" in line else config.TEXT_COLOR, font_size=16, anchor_x="center")
 
     def on_draw(self):
         try:
             self.clear()
             if self.show_map: self.gui_camera.use(); self.draw_map_overlay(); return
-            
             self.maze_camera.use()
+            
             if self.generating:
                 self.grid_shapes.draw()
                 for cell in self.grid.each_cell():
@@ -295,53 +264,27 @@ class GameView(arcade.View):
                     for link in cell.get_links():
                         if link.level == cell.level: lx, ly = self.renderer.get_pixel(link.row, link.column); arcade.draw_line(cx, cy, lx, ly, config.GENERATION_COLOR, 3)
             else:
-                # 1. Draw Maze Layers
                 if len(self.wall_shapes_layers) > self.current_level: self.wall_shapes_layers[self.current_level].draw()
                 if len(self.stair_shapes_layers) > self.current_level: self.stair_shapes_layers[self.current_level].draw()
                 if self.show_solution and self.solution_path:
-                    pts = [self.renderer.get_pixel(r, c) for r, c, l in self.solution_path if l == self.current_level]
-                    if len(pts) > 1: arcade.draw_line_strip(pts, self.solvers[self.current_solver_idx][2], 4)
-                if self.show_trace and len(self.path_history) > 1:
-                    pts = [self.renderer.get_pixel(r, c) for (r, c), l in self.path_history if l == self.current_level]
-                    if len(pts) > 1: arcade.draw_line_strip(pts, config.PATH_TRACE_COLOR, 2)
+                    pts = [self.renderer.get_pixel(r,c) for r,c,lv in self.solution_path if lv==self.current_level]
+                    if len(pts)>1: 
+                        # Get current theme color for the solver
+                        sol_colors = [config.COLOR_SOL_BFS, config.COLOR_SOL_DFS, config.COLOR_SOL_ASTAR]
+                        color = sol_colors[self.current_solver_idx]
+                        arcade.draw_line_strip(pts, color, 4)
+                if self.show_trace and len(self.path_history)>1:
+                    pts = [self.renderer.get_pixel(r,c) for (r,c),lv in self.path_history if lv==self.current_level]
+                    if len(pts)>1: arcade.draw_line_strip(pts, config.PATH_TRACE_COLOR, 2)
                 if self.current_level == self.end_pos[2]: gx, gy = self.renderer.get_pixel(self.end_pos[0], self.end_pos[1]); arcade.draw_circle_filled(gx, gy, self.renderer.cell_radius*0.4, config.GOAL_COLOR)
-                
-                # 2. Advanced Vision/Lighting Effect
-                if self.dark_mode and self.player_sprite:
-                    px, py = self.player_sprite.center_x, self.player_sprite.center_y
-                    light_radius = self.renderer.cell_radius * 5
-                    
-                    # A. Dynamic Shadow Volumes
-                    segments = self.renderer.get_wall_segments(self.current_level)
-                    for p1, p2 in segments:
-                        if math.hypot(p1[0]-px, p1[1]-py) < light_radius*1.5 or math.hypot(p2[0]-px, p2[1]-py) < light_radius*1.5:
-                            v1, v2 = (p1[0]-px, p1[1]-py), (p2[0]-px, p2[1]-py)
-                            m1, m2 = math.hypot(*v1), math.hypot(*v2)
-                            if m1 == 0 or m2 == 0: continue
-                            f = 4000
-                            p1_f = (p1[0] + v1[0]/m1*f, p1[1] + v1[1]/m1*f)
-                            p2_f = (p2[0] + v2[0]/m2*f, p2[1] + v2[1]/m2*f)
-                            arcade.draw_polygon_filled([p1, p2, p2_f, p1_f], (0, 0, 0, 255))
-                    
-                    # B. Stepped Radial Attenuation (5 discrete darkness rings)
-                    # From transparent (center) to absolute black (edge)
-                    for i in range(1, 6):
-                        r_inner = (i-1) * self.renderer.cell_radius
-                        r_outer = i * self.renderer.cell_radius
-                        alpha = (i-1) * 51 # Alpha: 0, 51, 102, 153, 204
-                        arcade.draw_circle_outline(px, py, (r_inner + r_outer)/2, (0, 0, 0, alpha), self.renderer.cell_radius + 1)
-                    
-                    # C. Global Darkness (Everything beyond 5 cells)
-                    arcade.draw_circle_outline(px, py, light_radius + 2000, (0, 0, 0, 255), 4000)
-
-                # 3. Final layer: Player is always visible
                 self.player_list.draw()
             
             self.gui_camera.use()
-            if self.generating:
+            if self.generating: 
                 if self.status_text: self.status_text.draw()
             else:
-                arcade.draw_lbwh_rectangle_filled(0, config.SCREEN_HEIGHT - 40, config.SCREEN_WIDTH, 40, (0, 0, 0, 180))
+                hud_bg = config.BG_COLOR + (180,)
+                arcade.draw_lbwh_rectangle_filled(0, config.SCREEN_HEIGHT-40, config.SCREEN_WIDTH, 40, hud_bg)
                 if self.hud_text_1: self.hud_text_1.draw()
                 if self.hud_stats: self.hud_stats.draw()
                 if self.hud_text_2: self.hud_text_2.draw()
@@ -353,14 +296,14 @@ class GameView(arcade.View):
     def on_update(self, delta_time: float):
         try:
             if self.generating:
-                try:
+                try: 
                     for _ in range(50): next(self.gen_iterator)
                 except (StopIteration, TypeError): self.finish_generation()
                 self.scroll_to_player(); return
             self.scroll_to_player()
             if self.game_won: return
             if self.solving and self.sol_iterator:
-                try:
+                try: 
                     for _ in range(5): self.solution_path = next(self.sol_iterator)
                 except StopIteration: self.solving = False
             if self.player_sprite and self.target_pos:
@@ -383,16 +326,14 @@ class GameView(arcade.View):
         if self.game_won and key == arcade.key.ENTER:
             if self.mode == "ADVENTURE":
                 engine = AdventureEngine(); diff = self.grid.levels * (self.grid.rows * self.grid.columns // 100)
-                if self.dark_mode: diff *= 1.5
                 engine.process_result(self.solve_duration, self.step_count, self.used_solution, self.used_map, int(diff))
                 params = engine.get_next_maze_params(); game = GameView(); game.setup(mode="ADVENTURE", **params); self.window.show_view(game)
             else: self.window.show_view(MenuView())
             return
-        if key == arcade.key.V: self.dark_mode = not self.dark_mode; return
         if key == arcade.key.M: self.show_map = not self.show_map; self.used_map = True if self.show_map else self.used_map; return
         if key == arcade.key.X:
             self.show_solution = not self.show_solution; self.used_solution = True if self.show_solution else self.used_solution
-            if self.show_solution and self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
+            if self.show_solution and self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.player_cell, self.grid.get_cell(*self.end_pos))
             return
         elif key == arcade.key.R: self.show_trace = not self.show_trace; return
         if self.show_map: return
@@ -406,7 +347,7 @@ class GameView(arcade.View):
                 px, py = self.renderer.get_pixel(self.player_cell.row, self.player_cell.column)
                 for n in self.player_cell.get_links():
                     if n.level != self.player_cell.level: continue
-                    nx, ny = self.renderer.get_pixel(n.row, n.column); dx_n, dy_n = nx-px, ny-py; mag = math.sqrt(dx_n*dx_n + dy_n*dy_n)
+                    nx, ny = self.renderer.get_pixel(n.row, n.column); dx_n, dy_n = nx-px, ny-py; mag = math.sqrt(dx_n*dx_n+dy_n*dy_n)
                     if mag == 0: continue
                     score = (dx_n/mag * dx_key) + (dy_n/mag * dy_key)
                     if score > 0.4 and score > best_score: best_score, best_n = score, n
@@ -419,8 +360,6 @@ class GameView(arcade.View):
                     if target and self.player_cell.is_linked(target): self.player_cell = target; px, py = self.renderer.get_pixel(target.row, target.column); self.player_sprite.center_x, self.player_sprite.center_y = px, py; self.target_pos = (px, py); self.step_count += 1; self.update_hud(); break
         elif key == arcade.key.TAB:
             self.current_solver_idx = (self.current_solver_idx + 1) % len(self.solvers); self.update_hud()
-            if self.show_solution and self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.grid.get_cell(*self.start_pos), self.grid.get_cell(*self.end_pos))
+            if self.show_solution and self.grid: self.solving, self.sol_iterator = True, self.solvers[self.current_solver_idx][0].solve_step(self.grid, self.player_cell, self.grid.get_cell(*self.end_pos))
         elif key == arcade.key.P: arcade.get_image().save("maze_export.png")
         elif key == arcade.key.ESCAPE: self.window.show_view(MenuView())
-
-    def on_key_release(self, key: int, modifiers: int): pass
