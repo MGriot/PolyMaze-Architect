@@ -1,6 +1,6 @@
 # Maze Generation Algorithms - Trade-offs
 
-This document outlines the performance characteristics and visual biases of the algorithms implemented in PolyMaze Architect.
+This document outlines the performance characteristics and visual biases of the algorithms implemented in PolyMaze Architect. For the underlying graph theory, see [Maze Theory](theory.md).
 
 ## 1. Recursive Backtracker (DFS)
 - **Visuals**: Long, winding corridors with few dead ends.

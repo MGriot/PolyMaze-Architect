@@ -46,3 +46,9 @@ The project follows a **Strict Decoupling** strategy to ensure that logic, data,
 5. `MazeGenerator` yields steps until the spanning tree is complete.
 6. `GameView` switches cameras (World, GUI, Map) per-frame to render the centered maze, HUD overlay, or 3D architectural stack.
 7. Upon completion, `AdventureEngine` processes results, updates skill vectors, and persists state.
+
+## 4. Further Reading
+- [**User Guide & Controls**](usage.md)
+- [**Adaptive Difficulty Logic**](adaptive_difficulty.md)
+- [**Maze Theory**](theory.md)
+- [**Algorithm Trade-offs**](algorithms.md)

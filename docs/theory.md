@@ -7,6 +7,7 @@ In graph theory, a **perfect maze** is a **Spanning Tree** of a grid graph.
 - A spanning tree is a subset of edges that connects all nodes without any cycles.
 
 ## 2. Generation Algorithms
+For a detailed analysis of performance and visual biases, see [Generation Algorithms - Trade-offs](algorithms.md).
 
 ### Randomized Depth-First Search (Recursive Backtracker)
 - **Mechanism**: A random walk that backtracks when trapped.

@@ -1,7 +1,7 @@
 # User Guide & Controls
 
 ## Main Menu
-- **ADVENTURE**: Progress through an adaptive challenge.
+- **ADVENTURE**: Progress through an adaptive challenge. See [Adaptive Difficulty](adaptive_difficulty.md) for details.
 - **CREATIVE / TRAINING**: Customize every aspect of the maze.
 
 ## Profile Selection (Adventure Mode)

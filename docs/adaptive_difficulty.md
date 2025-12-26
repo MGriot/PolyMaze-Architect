@@ -21,14 +21,14 @@ After every maze, the engine calculates a **Performance Score ($P_{score}$)**:
 ### Growth Formula
 Skills grow proportionally to $P_{score}$. If a player struggles (low $P_{score}$), the specific skill vector stabilizes or slightly decays to ensure the game remains fun. 
 
-**Manual Reset:** Using the `BACKSPACE` key to exit a maze prematurely results in an immediate XP penalty and a slight decay across all skill vectors.
+**Manual Reset:** Using the `BACKSPACE` key (see [User Guide](usage.md)) to exit a maze prematurely results in an immediate XP penalty and a slight decay across all skill vectors.
 
 ## 3. Dynamic Difficulty Adjustment (DDA)
 The engine translates the skill profile into maze parameters:
 - **Spatial Skill** $\rightarrow$ Rows, Columns, Floors.
 - **Perception Skill** $\rightarrow$ Triggers **Fog of War** and shrinks **FOV Radius**.
 - **Collection Skill** $\rightarrow$ Triggers **Star Collection** challenges.
-- **Structural Skill** $\rightarrow$ Unlocks Hex/Polar topologies and harder algorithms.
+- **Structural Skill** $\rightarrow$ Unlocks Hex/Polar topologies and harder [Algorithms](algorithms.md).
 - **Efficiency Skill** $\rightarrow$ Increases **Braid Factor** (less dead ends).
 
 ## 4. Momentum & Grace Periods

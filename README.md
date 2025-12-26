@@ -30,7 +30,9 @@ python src/main.py
 
 ## 📖 Documentation
 For deeper insights, check out the following guides in the `/docs` folder:
+- [**Adaptive Difficulty System**](docs/adaptive_difficulty.md): How Adventure mode learns from you.
 - [**Maze Theory & Algorithms**](docs/theory.md): The math behind the mazes.
+- [**Generation Algorithms - Trade-offs**](docs/algorithms.md): Comparative analysis of the 10 builders.
 - [**Software Architecture**](docs/architecture.md): How the modular layers work.
 - [**User Guide & Controls**](docs/usage.md): Comprehensive keybindings.
 
