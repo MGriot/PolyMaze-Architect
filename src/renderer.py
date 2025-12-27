@@ -90,15 +90,23 @@ class MazeRenderer:
             start_x, start_y = ox - (self.grid.columns * s)/2, oy - (self.grid.rows * s)/2
             for r in range(self.grid.rows + 1):
                 for c in range(self.grid.columns + 1):
+                    # Check if any cell around this corner is active
+                    neighbors = [
+                        self.grid.get_cell(r-1, c-1, level), self.grid.get_cell(r-1, c, level),
+                        self.grid.get_cell(r, c-1, level), self.grid.get_cell(r, c, level)
+                    ]
+                    if not any(neighbors): continue
+
                     px, py = start_x + c*s, start_y + r*s
                     add_post(px, py)
+                    
                     if r < self.grid.rows:
                         c1, c2 = self.grid.get_cell(r, c-1, level), self.grid.get_cell(r, c, level)
-                        if not c1 or not c2 or not c1.is_linked(c2):
+                        if (c1 or c2) and (not c1 or not c2 or not c1.is_linked(c2)):
                             polygons.append([(px - T, py + T), (px + T, py + T), (px + T, py + s - T), (px - T, py + s - T)])
                     if c < self.grid.columns:
                         c1, c2 = self.grid.get_cell(r-1, c, level), self.grid.get_cell(r, c, level)
-                        if not c1 or not c2 or not c1.is_linked(c2):
+                        if (c1 or c2) and (not c1 or not c2 or not c1.is_linked(c2)):
                             polygons.append([(px + T, py - T), (px + s - T, py - T), (px + s - T, py + T), (px + T, py + T)])
         else:
             for cell in self.grid.each_cell():

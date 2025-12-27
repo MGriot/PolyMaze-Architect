@@ -117,7 +117,11 @@ class CreativeMenuView(arcade.View):
         super().__init__()
         self.cell_types: List[Tuple[str, Type[Grid]]] = [("Square", SquareCellGrid), ("Hexagonal", HexCellGrid), ("Triangular", TriCellGrid), ("Polar", PolarCellGrid)]
         self.cell_idx: int = 0
-        self.shapes: List[str] = ["rectangle", "circle", "triangle", "hexagon"]
+        self.shapes: List[str] = [
+            "rectangle", "square", "circle", "oval", "semicircle", "triangle", 
+            "diamond", "rhombus", "cross", "parallelogram", "trapezoid", "kite", 
+            "pentagon", "hexagon", "heptagon", "octagon", "nonagon", "decagon", "donut"
+        ]
         self.shape_idx: int = 0
         self.sizes: List[Tuple[str, int, int]] = [
             ("Small", 11, 15), ("Medium", 21, 31), ("Large", 31, 41),
@@ -136,7 +140,7 @@ class CreativeMenuView(arcade.View):
         self.multi_path: bool = False
         self.levels: int = 1
         self.show_trace: bool = True
-        self.random_endpoints: bool = True
+        self.randomize_start_end: bool = True
         self.explorative_map: bool = False
         self.collect_stars: bool = False
         self.title_text: Optional[arcade.Text] = None
@@ -144,9 +148,9 @@ class CreativeMenuView(arcade.View):
 
     def on_show_view(self):
         arcade.set_background_color(config.BG_COLOR)
-        self.setup_ui()
+        self.setup_ui_text()
 
-    def setup_ui(self):
+    def setup_ui_text(self):
         cw, ch = config.SCREEN_WIDTH / 2, config.SCREEN_HEIGHT / 2
         self.title_text = arcade.Text("CREATIVE / TRAINING MODE", cw, ch + 220, config.TEXT_COLOR, font_size=30, anchor_x="center", bold=True)
         self.update_options()
@@ -161,7 +165,7 @@ class CreativeMenuView(arcade.View):
             f"V: Animation -> {'ENABLED' if self.animate else 'DISABLED'}",
             f"M: Multi-Path -> {'ON' if self.multi_path else 'OFF'}",
             f"L: 3D Levels -> {self.levels}",
-            f"E: Random Endpoints -> {'ON' if self.random_endpoints else 'OFF'}",
+            f"E: Random Start/End -> {'ON' if self.randomize_start_end else 'OFF'}",
             f"R: Show Trace -> {'ON' if self.show_trace else 'OFF'}",
             f"X: Explorative Map -> {'ON' if self.explorative_map else 'OFF'}",
             f"S: Collect Stars -> {'ON' if self.collect_stars else 'OFF'}",
@@ -189,13 +193,13 @@ class CreativeMenuView(arcade.View):
         elif key == arcade.key.V: self.animate = not self.animate
         elif key == arcade.key.M: self.multi_path = not self.multi_path
         elif key == arcade.key.L: self.levels = (self.levels % 6) + 1
-        elif key == arcade.key.E: self.random_endpoints = not self.random_endpoints
+        elif key == arcade.key.E: self.randomize_start_end = not self.randomize_start_end
         elif key == arcade.key.R: self.show_trace = not self.show_trace
         elif key == arcade.key.X: self.explorative_map = not self.explorative_map
         elif key == arcade.key.S: self.collect_stars = not self.collect_stars
         elif key == arcade.key.T:
             config.apply_theme("light" if config.CURRENT_THEME_NAME == "dark" else "dark")
-            arcade.set_background_color(config.BG_COLOR); self.setup_ui()
+            arcade.set_background_color(config.BG_COLOR); self.setup_ui_text()
         elif key == arcade.key.ENTER: self.start_game(); changed = False
         elif key == arcade.key.ESCAPE: self.window.show_view(MainMenuView()); changed = False
         else: changed = False
@@ -205,7 +209,7 @@ class CreativeMenuView(arcade.View):
         game = GameView(); mode = "CREATIVE"
         _, GridClass = self.cell_types[self.cell_idx]; shape = self.shapes[self.shape_idx]; _, rows, cols = self.sizes[self.size_idx]
         gen_name, GenClass = self.generators[self.gen_idx]
-        game.setup(GridClass, shape, rows, cols, self.levels, GenClass(), gen_name, self.animate, 0.5 if self.multi_path else 0.0, self.show_trace, self.random_endpoints, mode=mode, explorative_map=self.explorative_map, collect_stars=self.collect_stars)
+        game.setup(GridClass, shape, rows, cols, self.levels, GenClass(), gen_name, self.animate, 0.5 if self.multi_path else 0.0, self.show_trace, self.randomize_start_end, mode=mode, explorative_map=self.explorative_map, collect_stars=self.collect_stars)
         self.window.show_view(game)
 
 class GameView(arcade.View):
@@ -241,7 +245,7 @@ class GameView(arcade.View):
         self.map_camera = arcade.camera.Camera2D()
         self.panning_keys = set()
 
-    def setup(self, GridClass: Type[Grid], shape: str, rows: int, cols: int, levels: int, generator: MazeGenerator, gen_name: str, animate: bool, braid_pct: float, show_trace: bool, random_endpoints: bool, mode: str = "CREATIVE", **kwargs):
+    def setup(self, GridClass: Type[Grid], shape: str, rows: int, cols: int, levels: int, generator: MazeGenerator, gen_name: str, animate: bool, braid_pct: float, show_trace: bool, randomize_start_end: bool, mode: str = "CREATIVE", **kwargs):
         self.gen_name, self.braid_pct, self.grid, self.mode = gen_name, braid_pct, GridClass(rows, cols, levels), mode
         self.used_solution, self.used_map = False, False
         self.adventure_slot = kwargs.get("adventure_slot", 1)
@@ -262,15 +266,7 @@ class GameView(arcade.View):
                 elif gtype == "tri": pts = self.renderer.get_tri_verts(cell.row, cell.column, cx, cy, rad)
                 else: pts = [(cx-rad, cy-rad), (cx+rad, cy-rad), (cx+rad, cy+rad), (cx-rad, cy+rad)]
                 self.grid_shapes.append(arcade.shape_list.create_line_loop(pts, (60, 60, 60), 1))
-        self.setup_ui_text(); valid_cells = list(self.grid.each_cell())
-        if valid_cells:
-            if random_endpoints:
-                s_c = random.choice(valid_cells); e_c = random.choice(valid_cells)
-                while e_c == s_c and len(valid_cells)>1: e_c = random.choice(valid_cells)
-                self.start_pos, self.end_pos = (s_c.row, s_c.column, s_c.level), (e_c.row, e_c.column, e_c.level)
-            else:
-                valid_cells.sort(key=lambda c: (c.level, c.row, c.column))
-                s_c, e_c = valid_cells[0], valid_cells[-1]; self.start_pos, self.end_pos = (s_c.row, s_c.column, s_c.level), (e_c.row, e_c.column, e_c.level)
+        self.setup_ui_text(); self.randomize_start_end = randomize_start_end
         gx, gy = self.renderer.get_pixel(self.grid.rows//2, self.grid.columns//2); self.maze_camera.position = (gx, gy)
         
         # Adaptive Zoom Logic
@@ -284,7 +280,7 @@ class GameView(arcade.View):
 
     def setup_ui_text(self):
         self.hud_text_1 = arcade.Text("", 20, config.SCREEN_HEIGHT-25, config.TEXT_COLOR, font_size=12, bold=True)
-        self.hud_text_2 = arcade.Text("WASD: Move | X: Sol | R: Trace | V: FOV | +/-: Zoom | 0: Reset | M: Map | ESC: Menu", 20, config.SCREEN_HEIGHT-65, config.WALL_COLOR, font_size=10)
+        self.hud_text_2 = arcade.Text("WASD: Move | Q/E: Stairs | X: Sol | R: Trace | V: FOV | +/-: Zoom | 0: Reset | M: Map | ESC: Menu", 20, config.SCREEN_HEIGHT-65, config.WALL_COLOR, font_size=10)
         self.hud_stats = arcade.Text("", config.SCREEN_WIDTH-20, config.SCREEN_HEIGHT-25, config.HIGHLIGHT_COLOR, font_size=12, anchor_x="right", bold=True)
         self.status_text = arcade.Text("GENERATING...", config.SCREEN_WIDTH/2, 30, config.TEXT_COLOR, font_size=16, anchor_x="center")
         self.stair_prompt = arcade.Text("", config.SCREEN_WIDTH/2, 30, arcade.color.CYAN, font_size=18, anchor_x="center", bold=True); self.update_hud()
@@ -308,8 +304,27 @@ class GameView(arcade.View):
             self.generating = False; self.wall_shapes_layers = [self.renderer.create_wall_shapes(l) for l in range(self.grid.levels)]
             self.stair_shapes_layers = [self.renderer.create_stair_shapes(l) for l in range(self.grid.levels)]; self.generate_map_shapes()
             
+            # Select Start and End points (Avoiding stairs)
+            all_cells = list(self.grid.each_cell())
+            non_stair_cells = [c for c in all_cells if not any(n.level != c.level for n in c.get_links())]
+            valid_cells = non_stair_cells if len(non_stair_cells) >= 2 else all_cells
+
+            if valid_cells:
+                # Randomize BOTH Start and End positions if requested
+                if self.randomize_start_end:
+                    s_c = random.choice(valid_cells); e_c = random.choice(valid_cells)
+                    while e_c == s_c and len(valid_cells)>1: e_c = random.choice(valid_cells)
+                    self.start_pos, self.end_pos = (s_c.row, s_c.column, s_c.level), (e_c.row, e_c.column, e_c.level)
+                else:
+                    valid_cells.sort(key=lambda c: (c.level, c.row, c.column))
+                    s_c, e_c = valid_cells[0], valid_cells[-1]; self.start_pos, self.end_pos = (s_c.row, s_c.column, s_c.level), (e_c.row, e_c.column, e_c.level)
+
             if self.collect_stars:
-                potential = [c for c in self.grid.each_cell() if (c.row, c.column, c.level) not in [self.start_pos, self.end_pos]]
+                # Exclude Start, End, AND Stairs (cells with vertical links)
+                potential = [c for c in self.grid.each_cell() 
+                             if (c.row, c.column, c.level) not in [self.start_pos, self.end_pos]
+                             and not any(n.level != c.level for n in c.get_links())]
+                
                 if len(potential) >= 3: self.stars = random.sample(potential, 3)
                 else: self.stars = potential
 
@@ -363,6 +378,38 @@ class GameView(arcade.View):
             off = (0, l * mh * 1.5)
             box_color = (60, 60, 60, 80) if config.CURRENT_THEME_NAME == "dark" else (200, 200, 200, 80)
             arcade.draw_rect_filled(arcade.XYWH(config.SCREEN_WIDTH/2 + off[0], config.SCREEN_HEIGHT/2 + off[1], mw * 1.05, mh * 1.05), box_color)
+            arcade.draw_text(f"FLOOR {l+1}", config.SCREEN_WIDTH/2 + off[0], config.SCREEN_HEIGHT/2 + off[1] + mh * 0.55 + 10, config.HIGHLIGHT_COLOR, font_size=40, anchor_x="center", bold=True)
+            
+            # --- Coordinate Labels ---
+            # Columns (A, B, C...)
+            for c in range(self.grid.columns):
+                idx_r = self.grid.rows - 1 if self.renderer.grid_type == "polar" else 0
+                px, py_ref = self.renderer.get_pixel(idx_r, c, 1.0, off)
+                label = (chr(65 + (c // 26) - 1) if c >= 26 else "") + chr(65 + (c % 26))
+                
+                if self.renderer.grid_type == "polar":
+                     # Push outward from center
+                     dx, dy = px - (config.SCREEN_WIDTH/2 + off[0]), py_ref - (config.SCREEN_HEIGHT/2 + off[1])
+                     dist = math.sqrt(dx*dx + dy*dy)
+                     if dist > 0: px += (dx/dist)*25; py_ref += (dy/dist)*25
+                else:
+                     py_ref -= self.renderer.cell_radius * 2.0
+                
+                arcade.draw_text(label, px, py_ref, config.TEXT_COLOR, font_size=20, anchor_x="center", anchor_y="center")
+
+            # Rows (1, 2, 3...)
+            for r in range(self.grid.rows):
+                idx_c = self.grid.columns // 2 if self.renderer.grid_type == "polar" else 0
+                px_ref, py = self.renderer.get_pixel(r, idx_c, 1.0, off)
+                label = str(r + 1)
+                
+                if self.renderer.grid_type == "polar":
+                     px_ref -= 25
+                else:
+                     px_ref -= self.renderer.cell_radius * 2.0
+
+                arcade.draw_text(label, px_ref, py, config.TEXT_COLOR, font_size=20, anchor_x="center", anchor_y="center")
+            # -------------------------
             
             self.map_wall_shapes[l].draw(); self.map_stair_shapes[l].draw()
             
@@ -571,7 +618,16 @@ class GameView(arcade.View):
                 for link in self.player_cell.get_links():
                     if link.level > l: self.current_stair_options.append((link.level, "U"))
                     elif link.level < l: self.current_stair_options.append((link.level, "D"))
-                if self.stair_prompt: self.stair_prompt.text = f"STAIRS: Press {' / '.join(['['+o[1]+']' for o in self.current_stair_options])} to move" if self.current_stair_options else ""
+                
+                # Update Text Prompt for Q/E
+                if self.current_stair_options:
+                    prompt_parts = []
+                    for lvl, d_type in self.current_stair_options:
+                        key_hint = "Q" if d_type == "U" else "E"
+                        prompt_parts.append(f"[{key_hint}]")
+                    self.stair_prompt.text = f"STAIRS: Press {' / '.join(prompt_parts)} to move"
+                else:
+                    self.stair_prompt.text = ""
             self.update_hud()
         except Exception: traceback.print_exc()
 
@@ -641,8 +697,8 @@ class GameView(arcade.View):
                     score = (dx_n/mag * dx_key) + (dy_n/mag * dy_key)
                     if score > 0.4 and score > best_score: best_score, best_n = score, n
                 if best_n: self.player_cell, self.target_pos = best_n, self.renderer.get_pixel(best_n.row, best_n.column); self.step_count += 1
-        elif key in [arcade.key.U, arcade.key.D]:
-            td = "U" if key == arcade.key.U else "D"
+        elif key in [arcade.key.Q, arcade.key.E, arcade.key.U, arcade.key.J]:
+            td = "U" if key in [arcade.key.Q, arcade.key.U] else "D"
             for lv, ds in self.current_stair_options:
                 if ds == td and self.player_cell:
                     self.current_level = lv; target = self.grid.get_cell(self.player_cell.row, self.player_cell.column, lv) if self.grid else None

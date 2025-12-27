@@ -28,7 +28,7 @@ The engine translates the skill profile into maze parameters:
 - **Spatial Skill** $\rightarrow$ Rows, Columns, Floors.
 - **Perception Skill** $\rightarrow$ Triggers **Fog of War** and shrinks **FOV Radius**.
 - **Collection Skill** $\rightarrow$ Triggers **Star Collection** challenges.
-- **Structural Skill** $\rightarrow$ Unlocks Hex/Polar topologies and harder [Algorithms](algorithms.md).
+- **Structural Skill** $\rightarrow$ Unlocks Hex/Polar topologies and harder [Algorithms](algorithms.md). Unlocks Maze Forms: Triangle, Rhombus, Cross, Parallelogram, Trapezoid, Semicircle (Lvl 3+); Hexagon, Donut, Pentagon, Octagon, Kite (Lvl 6+); Heptagon, Nonagon, Decagon (Lvl 9+).
 - **Efficiency Skill** $\rightarrow$ Increases **Braid Factor** (less dead ends).
 
 ## 4. Momentum & Grace Periods

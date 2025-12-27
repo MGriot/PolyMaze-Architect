@@ -105,15 +105,31 @@ class AdventureEngine:
         
         braid_pct = min(0.5, p["efficiency"] * 0.03)
 
+        # Select Shape
+        shape = "rectangle"
+        if GridClass == PolarCellGrid:
+            polar_shapes = ["circle", "oval", "semicircle"]
+            if p["structural"] > 6: polar_shapes.append("donut")
+            shape = random.choice(polar_shapes)
+        else:
+            shapes = ["rectangle", "square", "circle", "oval"]
+            if p["structural"] > 3: 
+                shapes += ["triangle", "diamond", "rhombus", "cross", "parallelogram", "trapezoid", "semicircle"]
+            if p["structural"] > 6: 
+                shapes += ["hexagon", "donut", "pentagon", "octagon", "kite"]
+            if p["structural"] > 9:
+                shapes += ["heptagon", "nonagon", "decagon"]
+            shape = random.choice(shapes)
+
         return {
             "GridClass": GridClass,
-            "shape": "rectangle" if GridClass != PolarCellGrid else "circle",
+            "shape": shape,
             "rows": rows, "cols": cols, "levels": levels,
             "generator": AlgoClass(), "gen_name": gen_name,
             "animate": p["structural"] < 5.0,
             "braid_pct": braid_pct,
             "show_trace": True,
-            "random_endpoints": p["spatial"] > 6.0,
+            "randomize_start_end": p["spatial"] > 6.0,
             "dark_mode": dark_mode,
             "fov_radius": fov_radius,
             "explorative_map": explorative_map,

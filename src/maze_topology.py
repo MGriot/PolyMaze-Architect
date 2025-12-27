@@ -71,18 +71,83 @@ class Grid:
 
     def mask_shape(self, shape: str):
         """Disables cells outside the desired shape."""
+        shape = shape.lower()
+        # Pre-calculate aspect ratio for true geometric shapes (Square, Circle)
+        ar_cols = self.columns / max(1, self.rows)
+        ar_rows = self.rows / max(1, self.columns)
+        
+        # Generic N-gon helper
+        def is_ngon(nx, ny, n, rotate=False):
+            angle = math.atan2(ny, nx)
+            if rotate: angle += math.pi / n
+            r = math.sqrt(nx**2 + ny**2)
+            # Map angle to the sector of the polygon
+            segment = 2 * math.pi / n
+            # The distance from center to the edge at this angle
+            # d = r * cos( (theta % segment) - segment/2 )
+            # We want d <= apothem (distance from center to midpoint of edge)
+            # For a unit polygon (radius 1 at vertices), apothem is cos(pi/n)
+            # Actually, standard formula for "is inside unit polygon":
+            # r * cos( (angle % (2pi/n)) - pi/n ) <= cos(pi/n)
+            # This makes the vertices touch the unit circle.
+            return (r * math.cos((angle % segment) - segment / 2)) <= math.cos(math.pi / n)
+
         for level in self.grid:
             for row in level:
                 for cell in row:
                     nx, ny = self._get_normalized_coords(cell.row, cell.column)
                     keep = True
-                    if shape == "circle":
-                        keep = (nx**2 + ny**2) <= 1.1 
-                    elif shape == "triangle":
-                        keep = (ny > -0.7) and (ny < 1.732 * nx + 1.2) and (ny < -1.732 * nx + 1.2)
-                    elif shape == "hexagon":
-                        keep = max(abs(nx), abs(nx)*0.5 + abs(ny)*0.866) <= 0.98
                     
+                    if shape == "rectangle":
+                        keep = True
+                    elif shape == "square":
+                        # Force 1:1 aspect ratio mask
+                        if self.columns > self.rows: keep = abs(nx) <= (1.0 / ar_cols)
+                        else: keep = abs(ny) <= (1.0 / ar_rows)
+                    elif shape == "circle":
+                        # Force 1:1 aspect ratio circle
+                        dx, dy = nx, ny
+                        if self.columns > self.rows: dx *= ar_cols
+                        else: dy *= ar_rows
+                        keep = (dx**2 + dy**2) <= 1.0
+                    elif shape == "oval":
+                        keep = (nx**2 + ny**2) <= 1.0
+                    elif shape == "semicircle":
+                        # Bottom half (ny > 0) is cut off? Or top? 
+                        # ny goes -1 (top) to 1 (bottom). Let's keep top half.
+                        keep = (nx**2 + ny**2) <= 1.0 and ny <= 0.2
+                    elif shape == "donut":
+                        dist = nx**2 + ny**2
+                        keep = 0.25 <= dist <= 1.1
+                    elif shape == "triangle":
+                        # Equilateral-ish triangle pointing up
+                        keep = (ny > -0.7) and (ny < 1.732 * nx + 1.2) and (ny < -1.732 * nx + 1.2)
+                    elif shape == "diamond" or shape == "rhombus":
+                        keep = abs(nx) + abs(ny) <= 1.2
+                    elif shape == "parallelogram":
+                        # Skewed rectangle: x + 0.5y bounded
+                        keep = abs(nx - ny * 0.5) <= 0.7 and abs(ny) <= 0.8
+                    elif shape == "trapezoid":
+                        # Narrower at top (ny < 0)
+                        width = 0.8 if ny > 0 else (0.8 + ny * 0.4) 
+                        keep = abs(nx) <= width and abs(ny) <= 0.9
+                    elif shape == "kite":
+                        # Rhombus but lower part is elongated
+                        # Top half (ny < 0): like diamond
+                        # Bottom half (ny > 0): narrower
+                        if ny < 0: keep = abs(nx) + abs(ny) <= 1.2
+                        else: keep = abs(nx) + (ny * 0.5) <= 0.6 # Slower taper
+                        # Clean up bounds
+                        keep = keep and abs(ny) <= 1.0
+                    elif shape == "cross":
+                        keep = (abs(nx) <= 0.33) or (abs(ny) <= 0.33)
+                    elif shape == "pentagon": keep = is_ngon(nx, ny, 5, rotate=True)
+                    elif shape == "hexagon": keep = is_ngon(nx, ny, 6)
+                    elif shape == "heptagon": keep = is_ngon(nx, ny, 7, rotate=True)
+                    elif shape == "octagon": keep = is_ngon(nx, ny, 8)
+                    elif shape == "nonagon": keep = is_ngon(nx, ny, 9, rotate=True)
+                    elif shape == "decagon": keep = is_ngon(nx, ny, 10)
+
                     if not keep:
                         cell.active = False
                         for n in cell.neighbors:

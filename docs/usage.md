@@ -20,13 +20,13 @@ This script automatically configures the necessary paths.
 ## Creative / Training Setup
 Navigate using the following keys:
 - **G**: Cycle Cell Topology (**Square, Hexagonal, Triangular, Polar**).
-- **F**: Cycle Maze Form (**Rectangle, Circle, Triangle, Hexagon**).
+- **F**: Cycle Maze Form (**Rectangle, Square, Diamond, Rhombus, Cross, Circle, Oval, Semicircle, Donut, Triangle, Parallelogram, Trapezoid, Kite, and N-gons: Pentagon to Decagon**).
 - **Z**: Cycle Maze Size (Small, Medium, Large, X-Large, Epic, Colossal).
 - **A**: Cycle Generation Algorithm (10 available).
 - **L**: Set number of **3D Levels** (up to 6 floors).
 - **M**: Toggle **Multi-Path** (Braided) mode.
 - **V**: Toggle **Generation Animation**.
-- **E**: Toggle **Random Endpoints**.
+- **E**: Toggle **Random Start/End** (Randomizes both entry and exit points).
 - **R**: Toggle **Trace** (Breadcrumbs).
 - **X**: Toggle **Explorative Map** (Hides unvisited areas in Map view).
 - **S**: Toggle **Star Collection** (Spawn 3 stars that must be collected before exit).
@@ -36,7 +36,7 @@ Navigate using the following keys:
 
 ## Exploration (In-Game)
 - **WASD / Arrow Keys**: Discrete, cell-based movement with spatial alignment.
-- **U / D**: Move **Up** or **Down** levels when standing on a Stair.
+- **Q / E (or U / J)**: Move **Up (Q/U)** or **Down (E/J)** levels when standing on a Stair.
 - **X**: AI Solution Animation. 
     - *1st Press*: Show path to Exit.
     - *2nd Press*: Show path to all Stars + Exit (if Stars active).
@@ -46,7 +46,7 @@ Navigate using the following keys:
 - **+/-**: **Zoom In / Out** (0.1x to 3.0x).
 - **0**: Reset Zoom to 1.0x.
 - **TAB**: Change the AI solver algorithm (BFS, DFS, A*).
-- **M**: Toggle **Architectural Map** (Vertical exploded view).
+- **M**: Toggle **Architectural Map** (Vertical exploded view with coordinate helpers).
 - **P**: **Print** (Save current view as PNG).
 - **ESC**: Back to Menu (Profile Select or Creative Setup).
 
@@ -65,3 +65,4 @@ The HUD bar at the top provides real-time information:
 - **Green Circle**: Your Avatar (Architect).
 - **Thin Grey Outline**: Underlying grid structure (during generation).
 - **Blue Line**: Generation progress.
+- **Map Coordinates**: Battleship-style labels (A-Z for columns, 1-N for rows) to assist in spatial navigation and reference.
