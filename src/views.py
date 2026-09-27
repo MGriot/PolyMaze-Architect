@@ -378,7 +378,7 @@ class GameView(arcade.View):
             off = (0, l * mh * 1.5)
             box_color = (60, 60, 60, 80) if config.CURRENT_THEME_NAME == "dark" else (200, 200, 200, 80)
             arcade.draw_rect_filled(arcade.XYWH(config.SCREEN_WIDTH/2 + off[0], config.SCREEN_HEIGHT/2 + off[1], mw * 1.05, mh * 1.05), box_color)
-            arcade.draw_text(f"FLOOR {l+1}", config.SCREEN_WIDTH/2 + off[0], config.SCREEN_HEIGHT/2 + off[1] + mh * 0.55 + 10, config.HIGHLIGHT_COLOR, font_size=40, anchor_x="center", bold=True)
+            arcade.draw_text(f"FLOOR {l+1}", config.SCREEN_WIDTH/2 + off[0], config.SCREEN_HEIGHT/2 + off[1] + mh * 0.55 + 10, config.HIGHLIGHT_COLOR, font_size=46, anchor_x="center", bold=True)
             
             # --- Coordinate Labels ---
             # Columns (A, B, C...)
@@ -395,7 +395,7 @@ class GameView(arcade.View):
                 else:
                      py_ref -= self.renderer.cell_radius * 2.0
                 
-                arcade.draw_text(label, px, py_ref, config.TEXT_COLOR, font_size=20, anchor_x="center", anchor_y="center")
+                arcade.draw_text(label, px, py_ref, config.TEXT_COLOR, font_size=24, anchor_x="center", anchor_y="center")
 
             # Rows (1, 2, 3...)
             for r in range(self.grid.rows):
@@ -408,7 +408,7 @@ class GameView(arcade.View):
                 else:
                      px_ref -= self.renderer.cell_radius * 2.0
 
-                arcade.draw_text(label, px_ref, py, config.TEXT_COLOR, font_size=20, anchor_x="center", anchor_y="center")
+                arcade.draw_text(label, px_ref, py, config.TEXT_COLOR, font_size=24, anchor_x="center", anchor_y="center")
             # -------------------------
             
             self.map_wall_shapes[l].draw(); self.map_stair_shapes[l].draw()
@@ -438,7 +438,7 @@ class GameView(arcade.View):
             gl.glDisable(gl.GL_STENCIL_TEST)
 
         self.gui_camera.use()
-        arcade.draw_text("EXPLODED ARCHITECTURAL VIEW", config.SCREEN_WIDTH/2, config.SCREEN_HEIGHT-40, config.HIGHLIGHT_COLOR, font_size=20, anchor_x="center", bold=True)
+        arcade.draw_text("EXPLODED ARCHITECTURAL VIEW", config.SCREEN_WIDTH/2, config.SCREEN_HEIGHT-40, config.HIGHLIGHT_COLOR, font_size=40, anchor_x="center", bold=True)
         self._draw_map_legend()
 
     def _draw_map_legend(self):
