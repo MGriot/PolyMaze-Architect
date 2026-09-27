@@ -1,11 +1,13 @@
 # User Guide & Controls
 
 ## Launching the Application
-To start PolyMaze Architect, ensure your virtual environment is active and use the entry script:
+- **Installed build**: start *PolyMaze Architect* from the Start menu, Applications folder, or Android app drawer.
+- **From source** (virtual environment active):
 ```bash
-python run_app.py
+python src/main.py
 ```
-This script automatically configures the necessary paths.
+
+Every screen works with both keyboard and touch/mouse. Menu items are buttons: tap or click them, or use **UP/DOWN** + **ENTER**.
 
 ## Main Menu
 - **ADVENTURE**: Progress through an adaptive challenge. See [Adaptive Difficulty](adaptive_difficulty.md) for details.
@@ -14,7 +16,7 @@ This script automatically configures the necessary paths.
 ## Profile Selection (Adventure Mode)
 - **UP/DOWN**: Select between **3 Profile Slots**.
 - **ENTER**: Play with the selected profile.
-- **DEL**: Reset/Overwrite the selected profile.
+- **DEL** (or the **RESET** button): Erase the selected profile, after a confirmation.
 - **ESC**: Return to Main Menu.
 
 ## Creative / Training Setup
@@ -47,8 +49,20 @@ Navigate using the following keys:
 - **0**: Reset Zoom to 1.0x.
 - **TAB**: Change the AI solver algorithm (BFS, DFS, A*).
 - **M**: Toggle **Architectural Map** (Vertical exploded view with coordinate helpers).
-- **P**: **Print** (Save current view as PNG).
+- **P**: **Print** (Save current view as PNG to the data folder).
 - **ESC**: Back to Menu (Profile Select or Creative Setup).
+
+## Touch Controls (Android, touchscreens, mouse)
+- **Tap / hold** anywhere: walk one cell toward your finger; keep holding to keep walking.
+- **Swipe**: walk in the swipe direction (works on every topology, including hex and polar).
+- **Pinch** or **mouse wheel**: zoom.
+- **STAIRS UP / STAIRS DOWN** buttons appear when you stand on a stair.
+- **Tool column** (right edge): **MAP**, **SOLVE** (same tiers as `X`), solver name (tap to cycle, like `TAB`), **TRACE**, **FOV** (Creative only), **ZOOM +/-**, **MENU**.
+- **Map view**: drag to pan, pinch/wheel to zoom.
+- **Android back button**: same as **ESC**.
+
+## Saved Data
+Adventure profiles (`player_profile_<slot>.json`) and screenshots (`maze_exportNNNN.png`) live in the per-user data folder: `%APPDATA%\polymaze` on Windows, `~/Library/Application Support/polymaze` on macOS, `~/.config/polymaze` on Linux, and app-private storage on Android. Profiles from the old Arcade build (saved next to the app) are moved there automatically on first launch.
 
 ## The HUD (Heads-Up Display)
 The HUD bar at the top provides real-time information:
@@ -61,8 +75,11 @@ The HUD bar at the top provides real-time information:
 ## Visual Indicators
 - **Azure Triangle**: Stair leading Up.
 - **Brown Triangle**: Stair leading Down.
-- **Gold Circle**: Goal (Exit).
+- **Red Circle**: Goal (Exit).
+- **Gold Star**: Collectible star (dimmed once collected).
 - **Green Circle**: Your Avatar (Architect).
 - **Thin Grey Outline**: Underlying grid structure (during generation).
 - **Blue Line**: Generation progress.
 - **Map Coordinates**: Battleship-style labels (A-Z for columns, 1-N for rows) to assist in spatial navigation and reference.
+
+See also: [Packaging](packaging.md) · [Architecture](architecture.md) · [Adaptive Difficulty](adaptive_difficulty.md)

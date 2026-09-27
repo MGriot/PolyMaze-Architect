@@ -154,3 +154,11 @@ player_profile_1.json
 player_profile_2.json
 player_profile_3.json
 maze_export.png
+
+# Keep the committed PyInstaller spec
+!packaging/pyinstaller/polymaze.spec
+!buildozer.spec
+
+# Buildozer
+.buildozer/
+bin/

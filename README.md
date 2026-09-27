@@ -12,32 +12,47 @@
 - **Dynamic Lighting**: Real-time raycasted Field of View with stepped attenuation. In Adventure mode, FOV becomes a critical difficulty factor.
 - **Explorative Map**: Toggle a "Fog of War" on the Architectural view to show only areas you've physically explored.
 - **Architectural Overview**: Toggle an "exploded" view (`M` key) with full panning and zooming support.
-- **High Performance**: Powered by the **Arcade** library with GPU-batched rendering.
+- **Cross-Platform**: Built on **Kivy**: runs on Windows, macOS, Linux and **Android**, with touch controls (tap/hold/swipe to walk, pinch to zoom) alongside the classic keyboard layout.
+- **High Performance**: GPU-batched wall meshes and an angle-binned raycaster keep FOV fast even on Colossal grids.
 - **Themed UI**: Built-in **Dark** and **Light** modes with custom color palettes.
 
-## 🛠️ Quick Start
+## 📥 Install
 
-### 1. Requirements
-Ensure you have Python 3.10+ installed.
+Download the latest build from the project's **Releases** page:
 
-### 2. Installation
-Set up a virtual environment and install dependencies:
+| Platform | File |
+| --- | --- |
+| Windows | `PolyMazeArchitect-Setup-<version>.exe` (installer) or the portable `.zip` |
+| macOS | `PolyMazeArchitect-<version>-macos.dmg` (unsigned: right-click → Open the first time) |
+| Linux | `PolyMazeArchitect-<version>-linux-x86_64.tar.gz` |
+| Android | `polymazearchitect-<version>-debug.apk` (enable "Install unknown apps" to sideload) |
+
+Adventure profiles and screenshots are stored in your per-user data folder (`%APPDATA%\polymaze` on Windows, app-private storage on Android).
+
+## 🛠️ Run from Source
+
+Requires Python 3.10–3.13.
+
 ```bash
 python -m venv .venv
-.\.venv\Scripts\activate  # Windows
-source .venv/bin/activate  # Linux/Mac
-pip install -r requirements.txt
+.\.venv\Scripts\activate    # Windows
+source .venv/bin/activate    # Linux/Mac
+pip install -r requirements-dev.txt
+python src/main.py
 ```
 
-### 3. Run the Application
-Use the provided entry point script:
+Run the test suite (core logic only; no display needed):
 ```bash
-python run_app.py
+pytest
 ```
-Alternatively, run directly from source:
-```bash
-$env:PYTHONPATH="src"; python src/main.py
-```
+
+## 📦 Build Installers
+
+See [Packaging](docs/packaging.md) for details. In short:
+
+- **Desktop**: `pyinstaller packaging/pyinstaller/polymaze.spec --noconfirm` builds `dist/PolyMazeArchitect/`. On Windows, `iscc packaging\windows\polymaze.iss` then wraps it in an installer.
+- **Android**: `buildozer android debug` (Linux or WSL2) builds an APK into `bin/`.
+- **CI**: pushing a `v*` tag builds every platform and attaches the files to a GitHub Release.
 
 ## 📖 Documentation
 For deeper insights, check out the following guides in the `/docs` folder:
@@ -46,9 +61,13 @@ For deeper insights, check out the following guides in the `/docs` folder:
 - [**Generation Algorithms - Trade-offs**](docs/algorithms.md): Comparative analysis of the 10 builders.
 - [**Software Architecture**](docs/architecture.md): How the modular layers work.
 - [**User Guide & Controls**](docs/usage.md): Comprehensive keybindings.
-- [**Cross-Platform Roadmap**](docs/cross_platform_roadmap.md): Strategy for Android/iOS porting.
+- [**Packaging**](docs/packaging.md): Building the desktop installers and the Android APK.
+- [**Cross-Platform Roadmap**](docs/cross_platform_roadmap.md): The Kivy migration and what's next (iOS).
 
 ## 📂 Project Structure
-- `src/`: Source code.
+- `src/polymaze/core/`: UI-free game logic (topology, algorithms, geometry, rules, profiles, `themes.json`).
+- `src/polymaze/ui/`: Kivy frontend (screens, maze renderer, map overlay, HUD, input).
+- `src/main.py`: Entry point for development, PyInstaller and Buildozer.
+- `packaging/`: PyInstaller spec and Inno Setup script. `buildozer.spec` sits at the root.
+- `tests/`: Unit tests for the core.
 - `docs/`: Technical documentation and guides.
-- `themes.json`: JSON-based color palette definitions.

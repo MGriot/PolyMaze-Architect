@@ -1,35 +1,27 @@
-# Cross-Platform Conversion Roadmap
+# Cross-Platform Roadmap
 
-This document outlines the strategy for porting **PolyMaze Architect** from a desktop-only application (Python + Arcade) to a cross-platform mobile and desktop application (Android, iOS, Windows, Linux, MacOS).
+PolyMaze Architect was ported from **Arcade** (desktop only) to **Kivy** so that one Python codebase runs on Windows, macOS, Linux and Android, and later iOS.
 
-## 1. Primary Technical Objective
-Replace the **Arcade** library (which only supports Desktop) with **Kivy**, an industry-standard Python framework for cross-platform development that supports touch interfaces and mobile GPUs.
+## Status
 
-## 2. Core Porting Strategy: "Brain vs. Eyes"
-The project must be strictly decoupled into two layers:
+| Phase | Status |
+| --- | --- |
+| 1. Refactor core into `src/polymaze/core/` with zero UI imports | ✅ Done (enforced by `tests/test_core_is_ui_free.py`) |
+| 2. Kivy renderer, menus and HUD | ✅ Done |
+| 3. Unified input: keyboard + touch (tap/hold/swipe, pinch, on-screen buttons) | ✅ Done |
+| 4. Desktop packaging: PyInstaller + Inno Setup, CI builds | ✅ Done |
+| 5. Android packaging with Buildozer | ✅ Config + CI done; device testing pending |
+| 6. iOS (kivy-ios, requires a Mac + Apple Developer account) | ⏳ Not started |
 
-### A. The Brain (Logic Layer) - 100% Reuse
-The following files are "Pure Python" and will be moved into a core package that has **no dependencies** on UI libraries:
-- `maze_topology.py`: Grid mathematics and graph structures.
-- `maze_algorithms.py`: Spanning tree generators and A*/BFS solvers.
-- `adventure_engine.py`: Personalized skill profiles and adaptive learning model.
+## How the original hurdles were solved
+1. **Stencil management**: raw `pyglet.gl` stencil calls became Kivy `StencilPush / StencilUse / StencilUnUse / StencilPop` for both the FOV and the explorative map.
+2. **Save paths**: profiles and screenshots go to `App.user_data_dir` (app-private storage on Android, `%APPDATA%` on Windows). The core receives it as `data_dir`.
+3. **Responsive UI**: world geometry is centred on the origin and a camera fits it to any screen. UI sizes scale with window height and never shrink tap targets below ~40 dp.
+4. **Performance on mobile**: FOV raycasting was reworked (angular binning, deduplicated walls, cached polygons). Per-move cost on Colossal grids dropped from hundreds of ms to under ~25 ms on a desktop CPU.
 
-### B. The Eyes (Renderer Layer) - Full Rewrite
-The rendering and input handling must be rebuilt for Kivy:
-- `renderer.py`: Rewrite Arcade's `ShapeElementList` and vertex calculations using Kivy's `Canvas` instructions and `Vertex Instructions`.
-- `views.py`: Rebuild the menu system using Kivy's `Widget` and `Layout` system. Replace keyboard handlers with a unified input manager (Keyboard for Desktop, Virtual D-Pad/Touch for Mobile).
+## Next steps
+- Profile on a mid-range Android device. If FOV is still heavy on huge grids, lower `settings.FOV_RAYS` or cache FOV per cell.
+- Consider `sensorLandscape` orientation and a portrait layout for phones.
+- Sound effects via `kivy.core.audio.SoundLoader` and gamepad support via Kivy joystick events (see [TODO](../TODO.md)).
 
-## 3. Platform-Specific Tools
-- **Android/iOS**: Use **Buildozer** to compile the Python code into an ARM-compatible binary (`.apk`, `.aab`, or `.ipa`).
-- **Windows/Linux/Mac**: Use **PyInstaller** to bundle the app into a standalone executable.
-
-## 4. Key Technical Hurdles
-1. **Stencil Management**: Migrate the "Fog of War" and "Field of View" logic from Arcade's raw OpenGL stencil calls to Kivy's `StencilPush` and `StencilPop` instructions.
-2. **Dynamic Paths**: Update `adventure_engine.py` to detect the OS and use `app.user_data_dir` for saving profiles, as mobile OSs restrict direct file writing.
-3. **Responsive UI**: Replace fixed screen coordinates with a relative layout system to handle varying aspect ratios (e.g., 16:9 phones vs. 4:3 tablets).
-
-## 5. Phased Implementation Plan
-1. **Refactor Core**: Move logic to `src/core/` and ensure zero `import arcade` statements.
-2. **Kivy Prototype**: Build a basic "Main Menu" and "Square Grid" renderer in Kivy.
-3. **Input Layer**: Implement the touch-based navigation system.
-4. **Mobile Packaging**: Run the first Buildozer pass to test performance on an Android device.
+See also: [Packaging](packaging.md) · [Architecture](architecture.md)

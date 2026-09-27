@@ -1,0 +1,116 @@
+name: build
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pytest
+      # Core tests need no UI toolkit (enforced by tests/test_core_is_ui_free.py)
+      - run: pytest -q
+
+  desktop:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements-dev.txt
+      - run: pyinstaller packaging/pyinstaller/polymaze.spec --noconfirm
+
+      - name: Version
+        id: ver
+        shell: bash
+        run: echo "version=$(python -c 'import sys; sys.path.insert(0, "src"); import polymaze; print(polymaze.__version__)')" >> "$GITHUB_OUTPUT"
+
+      - name: Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) { choco install innosetup -y --no-progress }
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc "/DAppVersion=${{ steps.ver.outputs.version }}" packaging\windows\polymaze.iss
+          Compress-Archive -Path dist\PolyMazeArchitect\* -DestinationPath "dist\installer\PolyMazeArchitect-${{ steps.ver.outputs.version }}-windows-portable.zip"
+
+      - name: macOS disk image
+        if: runner.os == 'macOS'
+        run: hdiutil create -volname "PolyMaze Architect" -srcfolder dist/PolyMazeArchitect.app -ov -format UDZO "dist/PolyMazeArchitect-${{ steps.ver.outputs.version }}-macos.dmg"
+
+      - name: Linux archive
+        if: runner.os == 'Linux'
+        run: tar -czf "dist/PolyMazeArchitect-${{ steps.ver.outputs.version }}-linux-x86_64.tar.gz" -C dist PolyMazeArchitect
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ runner.os }}
+          path: |
+            dist/installer/*.exe
+            dist/installer/*.zip
+            dist/*.dmg
+            dist/*.tar.gz
+          if-no-files-found: error
+
+  android:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip autoconf libtool pkg-config zlib1g-dev \
+            libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
+      - run: pip install buildozer cython
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            .buildozer
+          key: buildozer-${{ hashFiles('buildozer.spec') }}
+      - run: yes | buildozer android debug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: bin/*.apk
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [desktop, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true
