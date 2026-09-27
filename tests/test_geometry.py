@@ -36,6 +36,12 @@ class TestGeometry(unittest.TestCase):
                     if abs(cross) > 1e-6: signs.add(cross > 0)
                 self.assertLessEqual(len(signs), 1, f"non-convex wall polygon in {gc.__name__}")
 
+    def test_shared_walls_emitted_once(self):
+        for gc in (SquareCellGrid, HexCellGrid, TriCellGrid, PolarCellGrid):
+            polys = _maze(gc).get_occlusion_polygons(0)
+            keys = [frozenset((round(x, 3), round(y, 3)) for x, y in p) for p in polys]
+            self.assertEqual(len(keys), len(set(keys)), f"duplicate wall polygons in {gc.__name__}")
+
     def test_star_points_and_labels(self):
         self.assertEqual(len(star_points(0, 0, 10, 4)), 10)
         self.assertEqual([column_label(i) for i in (0, 25, 26, 27)], ["A", "Z", "AA", "AB"])
@@ -67,6 +73,22 @@ class TestFOVPolygon(unittest.TestCase):
         geo = MazeGeometry(grid, 30.0, "rect")
         for x, y in geo.fov_polygon((5000, 5000), 0, radius=50):
             self.assertAlmostEqual(math.hypot(x - 5000, y - 5000), 50)
+
+    def test_matches_brute_force(self):
+        # Angular binning must give exactly the same outline as testing every segment on every ray.
+        for gc in (SquareCellGrid, HexCellGrid, TriCellGrid, PolarCellGrid):
+            geo = _maze(gc, rows=9, cols=11)
+            geo.grid.braid(0.3)
+            segs, push, radius = geo._get_segments(0), geo.wall_thickness * 0.4, geo.cell_radius * 5
+            for cell in list(geo.grid.each_cell())[::13]:
+                origin = geo.get_pixel(cell.row, cell.column)
+                for i, (x, y) in enumerate(geo.fov_polygon(origin, 0, radius=radius, rays=60)):
+                    a = 2 * math.pi * i / 60
+                    hits = [t for p1, p2 in segs
+                            if (t := MazeGeometry._ray_segment_intersect(origin, (math.cos(a), math.sin(a)), p1, p2)) is not None]
+                    best = min(hits, default=None)
+                    expected = radius if best is None or best >= radius else best + push
+                    self.assertAlmostEqual(math.hypot(x - origin[0], y - origin[1]), expected, places=6)
 
     def test_ray_segment_intersection(self):
         hit = MazeGeometry._ray_segment_intersect((0, 0), (1, 0), (10, -5), (10, 5))

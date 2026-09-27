@@ -20,6 +20,7 @@ class MazeGeometry:
         self.grid_type = grid_type
         self.inset_factor = 0.8
         self._segment_cache: Dict[int, List[Segment]] = {}
+        self._polygon_cache: Dict[int, List[Polygon]] = {}
         self._pixel_cache: Dict[Tuple[int, int], Point] = {}
         self._spatial_segments: Dict[int, Dict[Tuple[int, int], List[Segment]]] = {}
 
@@ -92,7 +93,18 @@ class MazeGeometry:
         return segments
 
     def get_occlusion_polygons(self, level: int, scale: float = 1.0, offset: Point = (0, 0), thickness_mult: float = 1.0) -> List[Polygon]:
-        """Calculates solid wall geometry using a Post-and-Beam model. All polygons are convex."""
+        """Calculates solid wall geometry using a Post-and-Beam model. All polygons are convex.
+
+        The default (unscaled, unshifted) geometry is cached, so call this only once the maze is final.
+        """
+        default = scale == 1.0 and tuple(offset) == (0, 0) and thickness_mult == 1.0
+        if default and level in self._polygon_cache:
+            return self._polygon_cache[level]
+        polygons = self._build_occlusion_polygons(level, scale, offset, thickness_mult)
+        if default: self._polygon_cache[level] = polygons
+        return polygons
+
+    def _build_occlusion_polygons(self, level: int, scale: float, offset: Point, thickness_mult: float) -> List[Polygon]:
         polygons = []
         R = self.cell_radius * scale
         T = R * (1.0 - self.inset_factor) * thickness_mult
@@ -153,6 +165,7 @@ class MazeGeometry:
                 for v1, v2, (dr, dc) in edges:
                     target_c = (c + dc) % self.grid.columns if self.grid_type == "polar" else c + dc
                     n = self.grid.get_cell(r + dr, target_c, level)
+                    if n and n < cell: continue  # shared wall: emitted once, by the lower cell
                     if not n or not cell.is_linked(n):
                         add_post(v1[0], v1[1]); add_post(v2[0], v2[1])
                         dx, dy = v2[0] - v1[0], v2[1] - v1[1]; dist = math.sqrt(dx*dx + dy*dy)
@@ -167,12 +180,18 @@ class MazeGeometry:
         grid_size = self.cell_radius * 4
         spatial_map: Dict[Tuple[int, int], List[Segment]] = {}
 
-        for p1, p2 in segments:
+        for seg in segments:
+            p1, p2 = seg
             gx1, gy1 = int(p1[0] // grid_size), int(p1[1] // grid_size)
             gx2, gy2 = int(p2[0] // grid_size), int(p2[1] // grid_size)
+            if gx1 == gx2 and gy1 == gy2:  # most segments sit inside one bucket
+                bucket = spatial_map.get((gx1, gy1))
+                if bucket is None: spatial_map[(gx1, gy1)] = [seg]
+                else: bucket.append(seg)
+                continue
             for gx in range(min(gx1, gx2), max(gx1, gx2) + 1):
                 for gy in range(min(gy1, gy2), max(gy1, gy2) + 1):
-                    spatial_map.setdefault((gx, gy), []).append((p1, p2))
+                    spatial_map.setdefault((gx, gy), []).append(seg)
         self._spatial_segments[level] = spatial_map
 
     def fov_polygon(self, origin: Point, level: int, radius: float = 300, rays: int = 60) -> Polygon:
@@ -184,27 +203,50 @@ class MazeGeometry:
         gx, gy = int(origin[0] // grid_size), int(origin[1] // grid_size)
         range_inc = int(radius // grid_size) + 1
 
-        active_segments = []
-        seen = set()
+        ox, oy = origin
+        two_pi = 2 * math.pi
+        step = two_pi / rays
+        eps = 1e-9
+        r2 = radius * radius
         spatial_map = self._spatial_segments[level]
 
-        for dx in range(-range_inc, range_inc + 1):
-            for dy in range(-range_inc, range_inc + 1):
-                for seg in spatial_map.get((gx + dx, gy + dy), []):
-                    if id(seg) not in seen:
-                        active_segments.append(seg)
-                        seen.add(id(seg))
+        # Bin each nearby segment into the rays whose angle falls inside its angular span,
+        # so a ray only tests the few segments in its direction instead of all of them.
+        per_ray: List[List[Segment]] = [[] for _ in range(rays)]
+        seen = set()
+        for bx in range(-range_inc, range_inc + 1):
+            for by in range(-range_inc, range_inc + 1):
+                for seg in spatial_map.get((gx + bx, gy + by), ()):
+                    if id(seg) in seen: continue
+                    seen.add(id(seg))
+                    (x1, y1), (x2, y2) = seg
+                    sx, sy = x2 - x1, y2 - y1
+                    l2 = sx * sx + sy * sy
+                    t = ((ox - x1) * sx + (oy - y1) * sy) / l2 if l2 else 0.0
+                    t = 0.0 if t < 0 else (1.0 if t > 1 else t)
+                    cx, cy = x1 + t * sx - ox, y1 + t * sy - oy
+                    d2 = cx * cx + cy * cy
+                    if d2 > r2: continue  # entirely out of range
+                    if d2 < eps:  # origin on the segment: it can block any direction
+                        for lst in per_ray: lst.append(seg)
+                        continue
+                    a1 = math.atan2(y1 - oy, x1 - ox) % two_pi
+                    span = (math.atan2(y2 - oy, x2 - ox) - a1) % two_pi
+                    if span > math.pi: a1, span = (a1 + span) % two_pi, two_pi - span
+                    for i in range(math.ceil((a1 - eps) / step), math.floor((a1 + span + eps) / step) + 1):
+                        per_ray[i % rays].append(seg)
 
-        T = self.wall_thickness
+        push = self.wall_thickness * 0.4  # Push slightly into wall for watertight mask
         outer_points = []
         for i in range(rays):
-            angle = 2 * math.pi * i / rays
-            dx, dy, min_t = math.cos(angle), math.sin(angle), radius
-            for p1, p2 in active_segments:
+            angle = step * i
+            dx, dy = math.cos(angle), math.sin(angle)
+            min_t = None
+            for p1, p2 in per_ray[i]:
                 t = self._ray_segment_intersect(origin, (dx, dy), p1, p2)
-                if t is not None and t < min_t:
-                    min_t = t + (T * 0.4) # Push slightly into wall for watertight mask
-            outer_points.append((origin[0] + dx * min_t, origin[1] + dy * min_t))
+                if t is not None and (min_t is None or t < min_t): min_t = t
+            dist = radius if min_t is None or min_t >= radius else min_t + push
+            outer_points.append((ox + dx * dist, oy + dy * dist))
         return outer_points
 
     @staticmethod

@@ -1,13 +1,11 @@
 # main.py
-import arcade
-import config
-from views import MainMenuView
+"""Entry point used by Buildozer (Android) and PyInstaller (desktop). For development: python src/main.py"""
+import os
+import sys
 
-def main():
-    window = arcade.Window(config.SCREEN_WIDTH, config.SCREEN_HEIGHT, config.SCREEN_TITLE)
-    menu = MainMenuView()
-    window.show_view(menu)
-    arcade.run()
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from polymaze.ui.app import run  # noqa: E402
 
 if __name__ == "__main__":
-    main()
+    run()
