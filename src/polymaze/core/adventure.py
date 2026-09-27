@@ -1,23 +1,44 @@
 import json
 import os
 import random
-from typing import Dict, Any, Tuple, Type
-from maze_topology import SquareCellGrid, HexCellGrid, TriCellGrid, PolarCellGrid, Grid
-from maze_algorithms import (
+import shutil
+from typing import Dict, Any, Optional
+from .topology import SquareCellGrid, HexCellGrid, TriCellGrid, PolarCellGrid
+from .algorithms import (
     RecursiveBacktracker, RandomizedPrims, AldousBroder,
     BinaryTree, Wilsons, Kruskals, Sidewinder, RecursiveDivision,
-    HuntAndKill, Ellers, MazeGenerator
+    HuntAndKill, Ellers
 )
 
+PROFILE_SLOTS = (1, 2, 3)
+
+def profile_path(slot: int, data_dir: str) -> str:
+    return os.path.join(data_dir, f"player_profile_{slot}.json")
+
+def delete_profile(slot: int, data_dir: str):
+    path = profile_path(slot, data_dir)
+    if os.path.exists(path): os.remove(path)
+
+def migrate_legacy_profiles(data_dir: str, legacy_dir: Optional[str] = None):
+    """Moves profiles saved next to the old Arcade build (in CWD) into data_dir."""
+    legacy_dir = legacy_dir or os.getcwd()
+    if os.path.abspath(legacy_dir) == os.path.abspath(data_dir): return
+    for slot in PROFILE_SLOTS:
+        old, new = profile_path(slot, legacy_dir), profile_path(slot, data_dir)
+        if os.path.exists(old) and not os.path.exists(new):
+            try: shutil.move(old, new)
+            except OSError: pass
+
 class AdventureEngine:
-    def __init__(self, slot: int = 1):
+    def __init__(self, slot: int = 1, data_dir: str = "."):
         self.slot = slot
-        self.profile_path = f"player_profile_{slot}.json"
+        self.data_dir = data_dir
+        self.profile_path = profile_path(slot, data_dir)
         self.data = self.load_profile()
 
     @staticmethod
-    def get_profile_info(slot: int) -> Dict[str, Any]:
-        path = f"player_profile_{slot}.json"
+    def get_profile_info(slot: int, data_dir: str = ".") -> Dict[str, Any]:
+        path = profile_path(slot, data_dir)
         if os.path.exists(path):
             try:
                 with open(path, "r") as f:
@@ -62,6 +83,13 @@ class AdventureEngine:
                     return data
             except Exception: pass
         return default_data
+
+    def save_profile(self):
+        os.makedirs(self.data_dir, exist_ok=True)
+        tmp = self.profile_path + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(self.data, f, indent=2)
+        os.replace(tmp, self.profile_path)
 
     def get_next_maze_params(self) -> Dict[str, Any]:
         p = self.data["skill_profile"]

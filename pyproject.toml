@@ -1,0 +1,29 @@
+[project]
+name = "polymaze"
+dynamic = ["version"]
+description = "Multi-topology maze generator, solver and adventure game"
+requires-python = ">=3.10"
+dependencies = ["kivy[base]>=2.3,<2.4"]
+
+[project.optional-dependencies]
+dev = ["pytest", "pyinstaller"]
+
+[project.gui-scripts]
+polymaze = "polymaze.ui.app:run"
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = { attr = "polymaze.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"polymaze.core" = ["themes.json"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

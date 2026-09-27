@@ -1,8 +1,8 @@
-# maze_algorithms.py
+# algorithms.py
 import random
 import heapq
 from collections import deque
-from maze_topology import Grid, Cell
+from .topology import Grid, Cell
 from typing import List, Tuple, Dict
 
 # --- GENERATORS ---

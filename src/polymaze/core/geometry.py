@@ -1,0 +1,259 @@
+# geometry.py
+"""World-space maze geometry. No UI imports.
+
+The maze is centred on the world origin (0, 0); a floor drawn with an
+``offset`` is centred on that offset instead. The UI camera handles
+screen placement and zoom.
+"""
+import math
+from typing import Tuple, List, Dict
+from .topology import Grid, Cell
+
+Point = Tuple[float, float]
+Segment = Tuple[Point, Point]
+Polygon = List[Point]
+
+class MazeGeometry:
+    def __init__(self, grid: Grid, cell_radius: float, grid_type: str):
+        self.grid = grid
+        self.cell_radius = cell_radius
+        self.grid_type = grid_type
+        self.inset_factor = 0.8
+        self._segment_cache: Dict[int, List[Segment]] = {}
+        self._pixel_cache: Dict[Tuple[int, int], Point] = {}
+        self._spatial_segments: Dict[int, Dict[Tuple[int, int], List[Segment]]] = {}
+
+    @property
+    def wall_thickness(self) -> float:
+        return self.cell_radius * (1.0 - self.inset_factor)
+
+    def get_pixel(self, r, c, scale=1.0, offset=(0, 0)) -> Point:
+        if scale == 1.0 and offset == (0, 0) and (r, c) in self._pixel_cache:
+            return self._pixel_cache[(r, c)]
+
+        R = self.cell_radius * scale
+        ox, oy = offset
+
+        if self.grid_type == "hex":
+            w, h = math.sqrt(3) * R, 1.5 * R
+            start_x, start_y = ox - (self.grid.columns + 0.5) * w / 2, oy - ((self.grid.rows - 1) * h + 2 * R) / 2
+            res = (start_x + c*w + (w/2 if r % 2 == 1 else 0) + w/2, start_y + r*h + R)
+        elif self.grid_type == "tri":
+            s = R * math.sqrt(3)
+            grid_w = (self.grid.columns + 1) * (s/2)
+            grid_h = self.grid.rows * 1.5 * R
+            start_x, start_y = ox - grid_w/2, oy - grid_h/2
+            cx = start_x + (c + 1) * (s/2)
+            cy = start_y + r * 1.5 * R + (0.5 * R if (r + c) % 2 == 0 else R)
+            res = (cx, cy)
+        elif self.grid_type == "polar":
+            rw = R * 1.5
+            radius = (rw * 2) + r * rw + rw/2
+            step = 2 * math.pi / self.grid.columns
+            angle = ((c + 0.5) * step) - math.pi / 2
+            res = (ox + radius * math.cos(angle), oy + radius * math.sin(angle))
+        else: # rect
+            s = R * 2
+            start_x, start_y = ox - (self.grid.columns * s)/2, oy - (self.grid.rows * s)/2
+            res = (start_x + c*s + R, start_y + r*s + R)
+
+        if scale == 1.0 and offset == (0, 0):
+            self._pixel_cache[(r, c)] = res
+        return res
+
+    def get_tri_verts(self, r, c, cx, cy, R):
+        s = R * math.sqrt(3)
+        if (r + c) % 2 == 0: # Upright ^
+            return (cx, cy + R), (cx + s/2, cy - R/2), (cx - s/2, cy - R/2)
+        else: # Inverted v
+            return (cx, cy - R), (cx + s/2, cy + R/2), (cx - s/2, cy + R/2)
+
+    def cell_outline(self, cell: Cell) -> Polygon:
+        """Outline used for the grid preview while a maze is generating."""
+        R = self.cell_radius
+        cx, cy = self.get_pixel(cell.row, cell.column)
+        if self.grid_type == "hex":
+            return [(cx + R*math.cos(math.radians(a)), cy + R*math.sin(math.radians(a))) for a in [30, 90, 150, 210, 270, 330]]
+        if self.grid_type == "tri":
+            return list(self.get_tri_verts(cell.row, cell.column, cx, cy, R))
+        return [(cx-R, cy-R), (cx+R, cy-R), (cx+R, cy+R), (cx-R, cy+R)]
+
+    def _get_segments(self, level: int) -> List[Segment]:
+        """Lazy-load and cache flattened segments for the level."""
+        if level in self._segment_cache:
+            return self._segment_cache[level]
+
+        segments = []
+        for poly in self.get_occlusion_polygons(level):
+            for i in range(len(poly)):
+                segments.append((poly[i], poly[(i + 1) % len(poly)]))
+
+        self._segment_cache[level] = segments
+        return segments
+
+    def get_occlusion_polygons(self, level: int, scale: float = 1.0, offset: Point = (0, 0), thickness_mult: float = 1.0) -> List[Polygon]:
+        """Calculates solid wall geometry using a Post-and-Beam model. All polygons are convex."""
+        polygons = []
+        R = self.cell_radius * scale
+        T = R * (1.0 - self.inset_factor) * thickness_mult
+        posts = {}
+
+        def add_post(px, py):
+            key = (round(px, 2), round(py, 2))
+            if key not in posts:
+                posts[key] = [(px - T, py - T), (px + T, py - T), (px + T, py + T), (px - T, py + T)]
+
+        if self.grid_type == "rect":
+            s = R * 2
+            ox, oy = offset
+            start_x, start_y = ox - (self.grid.columns * s)/2, oy - (self.grid.rows * s)/2
+            for r in range(self.grid.rows + 1):
+                for c in range(self.grid.columns + 1):
+                    # Check if any cell around this corner is active
+                    neighbors = [
+                        self.grid.get_cell(r-1, c-1, level), self.grid.get_cell(r-1, c, level),
+                        self.grid.get_cell(r, c-1, level), self.grid.get_cell(r, c, level)
+                    ]
+                    if not any(neighbors): continue
+
+                    px, py = start_x + c*s, start_y + r*s
+                    add_post(px, py)
+
+                    if r < self.grid.rows:
+                        c1, c2 = self.grid.get_cell(r, c-1, level), self.grid.get_cell(r, c, level)
+                        if (c1 or c2) and (not c1 or not c2 or not c1.is_linked(c2)):
+                            polygons.append([(px - T, py + T), (px + T, py + T), (px + T, py + s - T), (px - T, py + s - T)])
+                    if c < self.grid.columns:
+                        c1, c2 = self.grid.get_cell(r-1, c, level), self.grid.get_cell(r, c, level)
+                        if (c1 or c2) and (not c1 or not c2 or not c1.is_linked(c2)):
+                            polygons.append([(px + T, py - T), (px + s - T, py - T), (px + s - T, py + T), (px + T, py + T)])
+        else:
+            for cell in self.grid.each_cell():
+                if cell.level != level: continue
+                cx, cy = self.get_pixel(cell.row, cell.column, scale, offset)
+                r, c = cell.row, cell.column
+                edges = []
+                if self.grid_type == "hex":
+                    angles, deltas = [30, 90, 150, 210, 270, 330], ([(1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (0, 1)] if r % 2 == 0 else [(1, 1), (1, 0), (0, -1), (-1, 0), (-1, 1), (0, 1)])
+                    for i, (dr, dc) in enumerate(deltas):
+                        p1 = (cx + R * math.cos(math.radians(angles[i])), cy + R * math.sin(math.radians(angles[i])))
+                        p2 = (cx + R * math.cos(math.radians(angles[(i+1)%6])), cy + R * math.sin(math.radians(angles[(i+1)%6])))
+                        edges.append((p1, p2, (dr, dc)))
+                elif self.grid_type == "tri":
+                    p1, p2, p3 = self.get_tri_verts(r, c, cx, cy, R)
+                    edges = [(p2, p3, (-1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))] if (r + c) % 2 == 0 else [(p2, p3, (1, 0)), (p1, p2, (0, 1)), (p1, p3, (0, -1))]
+                elif self.grid_type == "polar":
+                    rw = R * 1.5; ir, or_ = (rw * 2) + r * rw, (rw * 2) + (r + 1) * rw
+                    step = 2 * math.pi / self.grid.columns; ts, te = c * step - math.pi/2, (c + 1) * step - math.pi/2
+                    ox, oy = offset
+                    v1, v2 = (ox+ir*math.cos(ts), oy+ir*math.sin(ts)), (ox+ir*math.cos(te), oy+ir*math.sin(te))
+                    v3, v4 = (ox+or_*math.cos(te), oy+or_*math.sin(te)), (ox+or_*math.cos(ts), oy+or_*math.sin(ts))
+                    edges = [(v1, v2, (-1, 0)), (v3, v4, (1, 0)), (v1, v4, (0, -1)), (v2, v3, (0, 1))]
+
+                for v1, v2, (dr, dc) in edges:
+                    target_c = (c + dc) % self.grid.columns if self.grid_type == "polar" else c + dc
+                    n = self.grid.get_cell(r + dr, target_c, level)
+                    if not n or not cell.is_linked(n):
+                        add_post(v1[0], v1[1]); add_post(v2[0], v2[1])
+                        dx, dy = v2[0] - v1[0], v2[1] - v1[1]; dist = math.sqrt(dx*dx + dy*dy)
+                        if dist > 0:
+                            nx, ny = -dy/dist * T, dx/dist * T
+                            polygons.append([(v1[0]-nx, v1[1]-ny), (v1[0]+nx, v1[1]+ny), (v2[0]+nx, v2[1]+ny), (v2[0]-nx, v2[1]-ny)])
+        return list(posts.values()) + polygons
+
+    def precalculate_spatial_data(self, level: int):
+        """Builds a spatial hash for wall segments to speed up FOV."""
+        segments = self._get_segments(level)
+        grid_size = self.cell_radius * 4
+        spatial_map: Dict[Tuple[int, int], List[Segment]] = {}
+
+        for p1, p2 in segments:
+            gx1, gy1 = int(p1[0] // grid_size), int(p1[1] // grid_size)
+            gx2, gy2 = int(p2[0] // grid_size), int(p2[1] // grid_size)
+            for gx in range(min(gx1, gx2), max(gx1, gx2) + 1):
+                for gy in range(min(gy1, gy2), max(gy1, gy2) + 1):
+                    spatial_map.setdefault((gx, gy), []).append((p1, p2))
+        self._spatial_segments[level] = spatial_map
+
+    def fov_polygon(self, origin: Point, level: int, radius: float = 300, rays: int = 60) -> Polygon:
+        """Low-poly FOV outline: one point per ray, star-shaped around ``origin``."""
+        if level not in self._spatial_segments:
+            self.precalculate_spatial_data(level)
+
+        grid_size = self.cell_radius * 4
+        gx, gy = int(origin[0] // grid_size), int(origin[1] // grid_size)
+        range_inc = int(radius // grid_size) + 1
+
+        active_segments = []
+        seen = set()
+        spatial_map = self._spatial_segments[level]
+
+        for dx in range(-range_inc, range_inc + 1):
+            for dy in range(-range_inc, range_inc + 1):
+                for seg in spatial_map.get((gx + dx, gy + dy), []):
+                    if id(seg) not in seen:
+                        active_segments.append(seg)
+                        seen.add(id(seg))
+
+        T = self.wall_thickness
+        outer_points = []
+        for i in range(rays):
+            angle = 2 * math.pi * i / rays
+            dx, dy, min_t = math.cos(angle), math.sin(angle), radius
+            for p1, p2 in active_segments:
+                t = self._ray_segment_intersect(origin, (dx, dy), p1, p2)
+                if t is not None and t < min_t:
+                    min_t = t + (T * 0.4) # Push slightly into wall for watertight mask
+            outer_points.append((origin[0] + dx * min_t, origin[1] + dy * min_t))
+        return outer_points
+
+    @staticmethod
+    def _ray_segment_intersect(or_pos, or_dir, p1, p2):
+        v1, v2, v3 = (or_pos[0] - p1[0], or_pos[1] - p1[1]), (p2[0] - p1[0], p2[1] - p1[1]), (-or_dir[1], or_dir[0])
+        dot = v2[0] * v3[0] + v2[1] * v3[1]
+        if abs(dot) < 1e-9: return None
+        t = (v2[0] * v1[1] - v2[1] * v1[0]) / dot
+        u = (v1[0] * v3[0] + v1[1] * v3[1]) / dot
+        return t if (t >= 0 and 0 <= u <= 1) else None
+
+    def stair_triangles(self, level: int, scale=1.0, offset=(0, 0)) -> List[Tuple[Polygon, str]]:
+        """Arrow triangles for cells with vertical links: ("U" up, "D" down)."""
+        result = []
+        size = 8 * scale
+        for cell in self.grid.each_cell():
+            if cell.level != level: continue
+            cx, cy = self.get_pixel(cell.row, cell.column, scale, offset)
+            for link in cell.get_links():
+                if link.level > cell.level: result.append(([(cx, cy+size), (cx-size, cy-size*0.75), (cx+size, cy-size*0.75)], "U"))
+                elif link.level < cell.level: result.append(([(cx, cy-size), (cx-size, cy+size*0.75), (cx+size, cy+size*0.75)], "D"))
+        return result
+
+    def get_maze_size(self) -> Tuple[float, float]:
+        R = self.cell_radius
+        if self.grid_type == "hex":
+            w, h = math.sqrt(3) * R, 1.5 * R
+            return (self.grid.columns + 0.5) * w, (self.grid.rows - 1) * h + 2 * R
+        elif self.grid_type == "tri":
+            s = R * math.sqrt(3)
+            return (self.grid.columns + 1) * (s/2), self.grid.rows * 1.5 * R + 0.5 * R
+        elif self.grid_type == "polar":
+            rw = R * 1.5; max_r = (rw * 2) + self.grid.rows * rw
+            return max_r * 2, max_r * 2
+        else: # rect
+            s = R * 2; return self.grid.columns * s, self.grid.rows * s
+
+    def floor_offset(self, level: int) -> Point:
+        """Offset used to stack floors vertically in the exploded map view."""
+        _, mh = self.get_maze_size()
+        return (0.0, level * mh * 1.5)
+
+def star_points(cx: float, cy: float, outer_radius: float, inner_radius: float, num_points: int = 5) -> Polygon:
+    points = []
+    for i in range(num_points * 2):
+        angle = math.radians(i * (180 / num_points) - 90)
+        radius = outer_radius if i % 2 == 0 else inner_radius
+        points.append((cx + radius * math.cos(angle), cy + radius * math.sin(angle)))
+    return points
+
+def column_label(c: int) -> str:
+    return (chr(65 + (c // 26) - 1) if c >= 26 else "") + chr(65 + (c % 26))

@@ -1,5 +1,5 @@
 import unittest
-from src.maze_topology import SquareCellGrid, HexCellGrid, TriCellGrid, PolarCellGrid
+from polymaze.core.topology import SquareCellGrid, HexCellGrid, TriCellGrid, PolarCellGrid
 
 class TestTopology(unittest.TestCase):
     def test_square_grid_neighbors(self):

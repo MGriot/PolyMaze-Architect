@@ -1,6 +1,6 @@
 import unittest
-from src.maze_topology import SquareCellGrid
-from src.maze_algorithms import HuntAndKill, Ellers, RecursiveBacktracker
+from polymaze.core.topology import SquareCellGrid
+from polymaze.core.algorithms import HuntAndKill, Ellers, RecursiveBacktracker
 
 class TestAlgorithms(unittest.TestCase):
     def test_hunt_and_kill(self):
