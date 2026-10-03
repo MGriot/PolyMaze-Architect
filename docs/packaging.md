@@ -76,6 +76,14 @@ buildozer android debug
 
 The first build downloads the Android SDK/NDK (several GB) and takes 20–40 minutes; later builds are incremental. The APK lands in `bin/`.
 
+Two workarounds for a bug in python-for-android v2026.05.09 ([kivy/python-for-android#3364](https://github.com/kivy/python-for-android/issues/3364)). That release re-creates its build venv over an existing one, which mixes two pip versions and fails with `ImportError: cannot import name 'BuildDependencyInstallError'`:
+
+- `buildozer.spec` builds `arm64-v8a` only, which covers practically all current phones. Add `armeabi-v7a` back once a p4a release includes the fix.
+- Before rebuilding, delete the old venv (CI does this automatically):
+  ```bash
+  rm -rf .buildozer/android/platform/build-*/build/venv
+  ```
+
 Install it on a phone with USB debugging enabled:
 
 ```bash

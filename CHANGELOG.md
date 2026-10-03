@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [v2.0.0] - 2026-10-03
 
 ### Added
-- **Android support**: `buildozer.spec` builds an APK/AAB from the same codebase. The app id is `io.github.mgriot.polymazearchitect`.
+- **Android support**: `buildozer.spec` builds an APK/AAB from the same codebase for 64-bit ARM phones (Android 7.0+). The app id is `io.github.mgriot.polymazearchitect`.
 - **Signed Android releases**: release APKs are signed with a permanent key (set up once with `tools/setup_android_signing.ps1`), so future versions install over this one and keep your saves.
 - **Desktop installers**: PyInstaller spec for Windows/macOS/Linux and an Inno Setup installer for Windows. The exe carries version details, and the installer closes a running copy before upgrading. `tools/build_windows.ps1` builds the installer and the portable zip locally.
 - **CI**: GitHub Actions runs the tests on every push and builds all platforms on `v*` tags. Each Release gets notes from this changelog, `SHA256SUMS.txt`, and a check that the tag matches the app version.

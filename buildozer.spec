@@ -28,7 +28,9 @@ android.permissions =
 # Google Play requires a recent target API; bump this to the level Play currently demands.
 android.api = 35
 android.minapi = 24
-android.archs = arm64-v8a, armeabi-v7a
+# 64-bit only for now: with p4a v2026.05.09, a second arch re-creates the build venv and corrupts its pip
+# (kivy/python-for-android#3364, fixed on develop). Add armeabi-v7a back once a p4a release includes the fix.
+android.archs = arm64-v8a
 android.allow_backup = True
 # GitHub Releases ship a sideloadable APK. For Google Play switch the release artifact to aab.
 android.release_artifact = apk

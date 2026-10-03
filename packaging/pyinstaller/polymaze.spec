@@ -6,6 +6,14 @@ import os
 import re
 import sys
 
+# Build-time only; the bundled app is unaffected.
+# - On Windows, PyInstaller imports every collected package in a helper process to record DLL search
+#   paths. Importing kivy.core.window there opens a real window, and on a GPU-less CI runner Kivy then
+#   blocks forever on an "OpenGL 2.0 not found" dialog. An unknown provider name makes that import a no-op.
+# - MIXED keeps Kivy from lowering the root logger to TRACE, which floods the PyInstaller output.
+os.environ["KIVY_WINDOW"] = "none"
+os.environ.setdefault("KIVY_LOG_MODE", "MIXED")
+
 from kivy.tools.packaging.pyinstaller_hooks import get_deps_minimal, hookspath, runtime_hooks
 
 APP_NAME = "PolyMazeArchitect"

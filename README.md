@@ -49,7 +49,7 @@ Download the file for your platform from the [latest release](https://github.com
 | Windows 10/11 (x64) | `PolyMazeArchitect-Setup-<version>.exe` (installer) or `PolyMazeArchitect-<version>-windows-x64-portable.zip` | The build isn't code-signed, so SmartScreen may warn: click **More info → Run anyway**. |
 | macOS (Apple Silicon) | `PolyMazeArchitect-<version>-macos-arm64.dmg` | Unsigned: right-click the app → **Open** the first time. |
 | Linux (x86_64) | `PolyMazeArchitect-<version>-linux-x86_64.tar.gz` | Extract and run `PolyMazeArchitect/PolyMazeArchitect`. |
-| Android 7.0+ | `PolyMazeArchitect-<version>-android.apk` | Allow **Install unknown apps** for your browser or file manager. |
+| Android 7.0+ (64-bit ARM) | `PolyMazeArchitect-<version>-android.apk` | Allow **Install unknown apps** for your browser or file manager. |
 
 New versions install over the old one and keep your saves. Every release lists SHA-256 checksums in `SHA256SUMS.txt`.
 

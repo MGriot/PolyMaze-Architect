@@ -35,6 +35,7 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -83,6 +84,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: ubuntu-22.04
+    timeout-minutes: 90
     env:
       HAS_SIGNING_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
@@ -110,6 +112,11 @@ jobs:
 
       - name: Version
         run: echo "VERSION=$(python -c 'import sys; sys.path.insert(0, "src"); import polymaze; print(polymaze.__version__)')" >> "$GITHUB_ENV"
+
+      # p4a v2026.05.09 re-runs `python -m venv` over an existing build venv, which mixes two pip versions
+      # (kivy/python-for-android#3364). Start every build from a fresh venv, including cached ones.
+      - name: Drop stale build venv
+        run: rm -rf .buildozer/android/platform/build-*/build/venv
 
       - name: Signed release APK
         if: env.HAS_SIGNING_KEY == 'true'
@@ -186,7 +193,7 @@ jobs:
           | Windows 10/11 (x64) | `PolyMazeArchitect-Setup-{v}.exe` (installer) or `PolyMazeArchitect-{v}-windows-x64-portable.zip` |
           | macOS (Apple Silicon) | `PolyMazeArchitect-{v}-macos-arm64.dmg` |
           | Linux (x86_64) | `PolyMazeArchitect-{v}-linux-x86_64.tar.gz` |
-          | Android 7.0+ | `PolyMazeArchitect-{v}-android.apk` |
+          | Android 7.0+ (64-bit ARM) | `PolyMazeArchitect-{v}-android.apk` |
 
           The Windows and macOS builds aren't code-signed: on Windows click **More info → Run anyway**; on macOS right-click the app → **Open** the first time. On Android allow **Install unknown apps**. SHA-256 checksums are in `SHA256SUMS.txt`.
           """)
