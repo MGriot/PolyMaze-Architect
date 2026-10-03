@@ -10,16 +10,22 @@ python src/main.py
 Every screen works with both keyboard and touch/mouse. Menu items are buttons: tap or click them, or use **UP/DOWN** + **ENTER**.
 
 ## Main Menu
+![Main menu](img/main-menu.png)
+
 - **ADVENTURE**: Progress through an adaptive challenge. See [Adaptive Difficulty](adaptive_difficulty.md) for details.
 - **CREATIVE / TRAINING**: Customize every aspect of the maze.
 
 ## Profile Selection (Adventure Mode)
+![Adventure profile selection with two saved slots](img/profiles.png)
+
 - **UP/DOWN**: Select between **3 Profile Slots**.
 - **ENTER**: Play with the selected profile.
 - **DEL** (or the **RESET** button): Erase the selected profile, after a confirmation.
 - **ESC**: Return to Main Menu.
 
 ## Creative / Training Setup
+![Creative / Training setup menu](img/creative-setup.png)
+
 Navigate using the following keys:
 - **G**: Cycle Cell Topology (**Square, Hexagonal, Triangular, Polar**).
 - **F**: Cycle Maze Form (**Rectangle, Square, Diamond, Rhombus, Cross, Circle, Oval, Semicircle, Donut, Triangle, Parallelogram, Trapezoid, Kite, and N-gons: Pentagon to Decagon**).
@@ -37,6 +43,8 @@ Navigate using the following keys:
 - **ESC**: Return to Main Menu.
 
 ## Exploration (In-Game)
+![In-game view with the solver path, trace, HUD and tool column](img/game-square.png)
+
 - **WASD / Arrow Keys**: Discrete, cell-based movement with spatial alignment.
 - **Q / E (or U / J)**: Move **Up (Q/U)** or **Down (E/J)** levels when standing on a Stair.
 - **X**: AI Solution Animation. 
@@ -51,6 +59,11 @@ Navigate using the following keys:
 - **M**: Toggle **Architectural Map** (Vertical exploded view with coordinate helpers).
 - **P**: **Print** (Save current view as PNG to the data folder).
 - **ESC**: Back to Menu (Profile Select or Creative Setup).
+
+## Architectural Map
+Press **M** (or the **MAP** button) for the exploded view of every floor, with the solution, your trace, stairs and Battleship-style coordinates. With **Explorative Map** on, only the cells you have visited are shown.
+
+![Exploded architectural view of a two-floor maze](img/map-view.png)
 
 ## Touch Controls (Android, touchscreens, mouse)
 - **Tap / hold** anywhere: walk one cell toward your finger; keep holding to keep walking.
@@ -73,6 +86,8 @@ The HUD bar at the top provides real-time information:
     - **ZOOM**: Current magnification level.
 
 ## Visual Indicators
+![Dynamic FOV: only the area the player can see is lit](img/game-fov.png)
+
 - **Azure Triangle**: Stair leading Up.
 - **Brown Triangle**: Stair leading Down.
 - **Red Circle**: Goal (Exit).

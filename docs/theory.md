@@ -6,6 +6,16 @@ In graph theory, a **perfect maze** is a **Spanning Tree** of a grid graph.
 - Every path is an edge ($E$).
 - A spanning tree is a subset of edges that connects all nodes without any cycles.
 
+The same idea works on any grid graph. PolyMaze builds the tree on four topologies, where each cell has a different number of neighbours:
+
+| Square (4) | Hexagonal (6) |
+| :---: | :---: |
+| ![Square grid maze](img/game-square.png) | ![Hexagonal grid maze](img/game-hex.png) |
+| **Triangular (3)** | **Polar (varies by ring)** |
+| ![Triangular grid maze](img/game-tri.png) | ![Polar grid maze](img/game-polar.png) |
+
+**Multi-Path** mode then "braids" the tree by removing some dead ends, which adds cycles. The result is no longer a perfect maze.
+
 ## 2. Generation Algorithms
 For a detailed analysis of performance and visual biases, see [Generation Algorithms - Trade-offs](algorithms.md).
 

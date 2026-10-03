@@ -2,6 +2,10 @@
 
 This document explains the **Personalized Skill Profile** system used in Adventure Mode to provide a highly adaptive and personalized experience. Instead of a linear level, the system tracks a multidimensional vector of the player's abilities.
 
+![Adventure profile slots showing level, experience and mazes completed](img/profiles.png)
+
+The **LVL** shown on each slot is the average of the skill vectors below.
+
 ## 1. The Multidimensional Profile
 The engine tracks four distinct skill vectors for each player:
 - **Spatial Complexity:** Ability to navigate large grids and multi-level (3D) structures.
@@ -30,6 +34,10 @@ The engine translates the skill profile into maze parameters:
 - **Collection Skill** $\rightarrow$ Triggers **Star Collection** challenges.
 - **Structural Skill** $\rightarrow$ Unlocks Hex/Polar topologies and harder [Algorithms](algorithms.md). Unlocks Maze Forms: Triangle, Rhombus, Cross, Parallelogram, Trapezoid, Semicircle (Lvl 3+); Hexagon, Donut, Pentagon, Octagon, Kite (Lvl 6+); Heptagon, Nonagon, Decagon (Lvl 9+).
 - **Efficiency Skill** $\rightarrow$ Increases **Braid Factor** (less dead ends).
+
+| Collection challenge | Limited FOV |
+| :---: | :---: |
+| [![Collecting stars on the way to the exit](img/demo-stars.webp)](video/stars.mp4) | ![Dynamic FOV lighting only the visible corridors](img/game-fov.png) |
 
 ## 4. Momentum & Grace Periods
 - **Momentum:** Winning 3+ times efficiently increases the `growth_rate`.

@@ -162,3 +162,6 @@ maze_export.png
 # Buildozer
 .buildozer/
 bin/
+
+# Original screen recordings and old screenshots (compressed copies live in docs/img and docs/video)
+docs/_raw/
