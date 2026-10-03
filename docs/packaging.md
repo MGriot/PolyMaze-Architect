@@ -63,10 +63,10 @@ Buildozer only runs on Linux. On Windows use **WSL2 (Ubuntu)**:
 ```bash
 sudo apt update
 sudo apt install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev cmake libffi-dev libssl-dev
-pip install --user buildozer==1.6.0 cython==3.0.11
+pip install --user buildozer==1.6.0 cython==0.29.37
 ```
 
-Kivy 2.3.1 supports Cython up to 3.0.11, so keep the pin.
+Keep these pins: Buildozer 1.6.0 requires Cython older than 3.0, and Kivy 2.3.1 accepts 0.29.1 to 3.0.11.
 
 From the repo root (inside WSL, e.g. `/mnt/c/Users/<you>/Documents/Coding/PolyMaze Architect`):
 

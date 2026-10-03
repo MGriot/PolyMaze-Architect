@@ -15,6 +15,15 @@
 param([string]$Python, [switch]$RequireInstaller)
 
 $ErrorActionPreference = 'Stop'
+
+# Windows PowerShell 5.1 turns a native tool's redirected stderr into terminating errors under 'Stop';
+# rely on the exit code instead.
+function Invoke-Native {
+    $exe, $rest = $args  # plain $args so flags like -m reach the tool untouched
+    $ErrorActionPreference = 'Continue'
+    & $exe @rest
+    if ($LASTEXITCODE) { throw "$(Split-Path -Leaf $exe) failed ($LASTEXITCODE)" }
+}
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 
@@ -26,8 +35,7 @@ if (-not $Python) {
 $Version = (Select-String -Path 'src\polymaze\__init__.py' -Pattern '__version__ = "(.+)"').Matches[0].Groups[1].Value
 Write-Host "PolyMaze Architect $Version" -ForegroundColor Cyan
 
-& $Python -m PyInstaller packaging\pyinstaller\polymaze.spec --noconfirm
-if ($LASTEXITCODE) { throw "PyInstaller failed ($LASTEXITCODE)" }
+Invoke-Native $Python -m PyInstaller packaging\pyinstaller\polymaze.spec --noconfirm
 
 $OutDir = Join-Path $Root 'dist\installer'
 New-Item -ItemType Directory -Force $OutDir | Out-Null
@@ -38,8 +46,7 @@ if (-not $Iscc) {
               "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
 if ($Iscc) {
-    & $Iscc "/DAppVersion=$Version" packaging\windows\polymaze.iss
-    if ($LASTEXITCODE) { throw "Inno Setup failed ($LASTEXITCODE)" }
+    Invoke-Native $Iscc "/DAppVersion=$Version" packaging\windows\polymaze.iss
 } elseif ($RequireInstaller) {
     throw 'Inno Setup 6 (ISCC.exe) not found.'
 } else {

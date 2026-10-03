@@ -25,6 +25,15 @@ $Keystore = Join-Path $Dir 'polymaze-release.keystore'
 $Info = Join-Path $Dir 'polymaze-release.txt'
 $Alias = 'polymaze'
 
+# Windows PowerShell 5.1 turns a native tool's redirected stderr into terminating errors under 'Stop';
+# rely on the exit code instead.
+function Invoke-Native {
+    $exe, $rest = $args  # plain $args so flags reach the tool untouched
+    $ErrorActionPreference = 'Continue'
+    & $exe @rest
+    if ($LASTEXITCODE) { throw "$(Split-Path -Leaf $exe) $($rest[0]) failed ($LASTEXITCODE)" }
+}
+
 function Find-Keytool {
     $cmd = Get-Command keytool -ErrorAction SilentlyContinue
     if ($cmd) { return $cmd.Source }
@@ -33,9 +42,8 @@ function Find-Keytool {
 }
 
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { throw 'GitHub CLI (gh) not found: winget install GitHub.cli' }
-gh auth status *> $null
-if ($LASTEXITCODE) { throw 'Run "gh auth login" first.' }
-if (-not $Repo) { $Repo = gh repo view --json nameWithOwner --jq .nameWithOwner }
+try { Invoke-Native gh auth status *> $null } catch { throw 'Run "gh auth login" first.' }
+if (-not $Repo) { $Repo = Invoke-Native gh repo view --json nameWithOwner --jq .nameWithOwner }
 if (-not $Repo) { throw 'Could not detect the repository; pass -Repo owner/name.' }
 
 if (Test-Path $Keystore) {
@@ -52,10 +60,9 @@ if (Test-Path $Keystore) {
 
     $env:POLYMAZE_KS_PASS = $Password  # keeps the password off the command line
     try {
-        & (Find-Keytool) -genkeypair -v -storetype PKCS12 -keystore $Keystore -alias $Alias `
+        Invoke-Native (Find-Keytool) -genkeypair -v -storetype PKCS12 -keystore $Keystore -alias $Alias `
             -keyalg RSA -keysize 4096 -validity 10000 -dname 'CN=MGriot, O=PolyMaze Architect' `
-            -storepass:env POLYMAZE_KS_PASS -keypass:env POLYMAZE_KS_PASS
-        if ($LASTEXITCODE) { throw "keytool failed ($LASTEXITCODE)" }
+            '-storepass:env' POLYMAZE_KS_PASS '-keypass:env' POLYMAZE_KS_PASS  # quoted: PowerShell splits -flag:value
     } finally { Remove-Item Env:POLYMAZE_KS_PASS }
 
     @(
@@ -75,10 +82,14 @@ $secrets = [ordered]@{
     ANDROID_KEY_ALIAS         = $Alias
     ANDROID_KEY_PASSWORD      = $Password
 }
-foreach ($name in $secrets.Keys) {
-    $secrets[$name] | gh secret set $name --repo $Repo  # value goes through stdin
-    if ($LASTEXITCODE) { throw "gh secret set $name failed" }
-}
+# A dotenv file keeps the values off the command line. Piping to stdin is avoided because
+# Windows PowerShell 5.1 prepends a BOM to piped text.
+$envFile = Join-Path $Dir 'secrets.env.tmp'
+try {
+    $lines = foreach ($name in $secrets.Keys) { "$name=`"$($secrets[$name])`"" }
+    [IO.File]::WriteAllText($envFile, ($lines -join "`n") + "`n", (New-Object Text.UTF8Encoding $false))
+    Invoke-Native gh secret set --env-file $envFile --repo $Repo
+} finally { Remove-Item $envFile -ErrorAction SilentlyContinue }
 
 Write-Host ''
 Write-Host "Uploaded 4 Android signing secrets to $Repo." -ForegroundColor Green

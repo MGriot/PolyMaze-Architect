@@ -17,7 +17,10 @@ ASSETS = os.path.join(SRC, "polymaze", "assets")
 with open(os.path.join(SRC, "polymaze", "__init__.py"), encoding="utf-8") as f:
     VERSION = re.search(r'__version__ = ["\']([^"\']+)["\']', f.read()).group(1)
 
-deps = get_deps_minimal(video=None, audio=None, camera=None, spelling=None)
+# Name the window/clipboard providers instead of letting Kivy detect them: detection opens a real
+# window, which fails on headless CI (no X server on Linux; a blocking "OpenGL 2.0 not found" dialog
+# on Windows runners). Image and text are still auto-detected; that needs no window.
+deps = get_deps_minimal(window="sdl2", clipboard=["sdl2", "dummy"], video=None, audio=None, camera=None, spelling=None)
 
 a = Analysis(
     [os.path.join(SRC, "main.py")],
