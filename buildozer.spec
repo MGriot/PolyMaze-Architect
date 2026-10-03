@@ -1,11 +1,11 @@
 [app]
 # Android build. Buildozer runs on Linux only: use WSL2 (Ubuntu) or the CI workflow.
-#     buildozer android debug             -> bin/*.apk (sideload / emulator)
-#     buildozer android release           -> bin/*.aab (Play Store, needs a signing key)
+#     buildozer android debug             -> bin/*-debug.apk (sideload / emulator, throwaway debug key)
+#     buildozer android release           -> bin/*-release.apk (signed with the P4A_RELEASE_* key, see docs/packaging.md)
 title = PolyMaze Architect
 package.name = polymazearchitect
-# Change to a domain you own before publishing; it becomes the permanent app id.
-package.domain = io.github.polymaze
+# Permanent app id: io.github.mgriot.polymazearchitect. Changing it makes a different app that can't upgrade this one.
+package.domain = io.github.mgriot
 
 source.dir = src
 source.include_exts = py,png,json
@@ -30,7 +30,8 @@ android.api = 35
 android.minapi = 24
 android.archs = arm64-v8a, armeabi-v7a
 android.allow_backup = True
-android.release_artifact = aab
+# GitHub Releases ship a sideloadable APK. For Google Play switch the release artifact to aab.
+android.release_artifact = apk
 android.debug_artifact = apk
 # Lets unattended builds (CI) download the SDK; you are accepting the Android SDK license.
 android.accept_sdk_license = True

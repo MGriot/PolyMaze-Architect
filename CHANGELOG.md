@@ -2,12 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v2.0.0] - 2026-09-27
+## [v2.0.0] - 2026-10-03
 
 ### Added
-- **Android support**: `buildozer.spec` builds an APK/AAB from the same codebase.
-- **Desktop installers**: PyInstaller spec for Windows/macOS/Linux and an Inno Setup installer for Windows.
-- **CI**: GitHub Actions runs the tests on every push and builds all platforms on `v*` tags, attaching them to a Release.
+- **Android support**: `buildozer.spec` builds an APK/AAB from the same codebase. The app id is `io.github.mgriot.polymazearchitect`.
+- **Signed Android releases**: release APKs are signed with a permanent key (set up once with `tools/setup_android_signing.ps1`), so future versions install over this one and keep your saves.
+- **Desktop installers**: PyInstaller spec for Windows/macOS/Linux and an Inno Setup installer for Windows. The exe carries version details, and the installer closes a running copy before upgrading. `tools/build_windows.ps1` builds the installer and the portable zip locally.
+- **CI**: GitHub Actions runs the tests on every push and builds all platforms on `v*` tags. Each Release gets notes from this changelog, `SHA256SUMS.txt`, and a check that the tag matches the app version.
+- **Screenshots and clips** in the README and docs, captured from the app with `tools/capture_screenshots.py`.
 - **Touch controls**: tap/hold/swipe to walk, pinch or mouse-wheel zoom, drag to pan the map, on-screen tool and stair buttons.
 - **Clickable menus**: every menu option is a button; keyboard navigation still works.
 - **App icon and splash screen** (`tools/make_assets.py`).

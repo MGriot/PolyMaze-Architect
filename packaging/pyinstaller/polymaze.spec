@@ -3,6 +3,7 @@
 #     pyinstaller packaging/pyinstaller/polymaze.spec --noconfirm
 # Output: dist/PolyMazeArchitect/ (and dist/PolyMazeArchitect.app on macOS)
 import os
+import re
 import sys
 
 from kivy.tools.packaging.pyinstaller_hooks import get_deps_minimal, hookspath, runtime_hooks
@@ -11,6 +12,10 @@ APP_NAME = "PolyMazeArchitect"
 ROOT = os.path.abspath(os.path.join(SPECPATH, "..", ".."))
 SRC = os.path.join(ROOT, "src")
 ASSETS = os.path.join(SRC, "polymaze", "assets")
+
+# Single source of truth for the version: src/polymaze/__init__.py
+with open(os.path.join(SRC, "polymaze", "__init__.py"), encoding="utf-8") as f:
+    VERSION = re.search(r'__version__ = ["\']([^"\']+)["\']', f.read()).group(1)
 
 deps = get_deps_minimal(video=None, audio=None, camera=None, spelling=None)
 
@@ -29,6 +34,28 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
+def windows_version_info():
+    """Details tab of the .exe Properties dialog."""
+    from PyInstaller.utils.win32.versioninfo import (FixedFileInfo, StringFileInfo, StringStruct, StringTable,
+                                                     VarFileInfo, VarStruct, VSVersionInfo)
+    nums = tuple(int(n) for n in re.findall(r"\d+", VERSION)[:4])
+    nums += (0,) * (4 - len(nums))
+    strings = {
+        "CompanyName": "MGriot",
+        "FileDescription": "PolyMaze Architect",
+        "FileVersion": VERSION,
+        "InternalName": APP_NAME,
+        "LegalCopyright": "MGriot",
+        "OriginalFilename": f"{APP_NAME}.exe",
+        "ProductName": "PolyMaze Architect",
+        "ProductVersion": VERSION,
+    }
+    return VSVersionInfo(
+        ffi=FixedFileInfo(filevers=nums, prodvers=nums),
+        kids=[StringFileInfo([StringTable("040904B0", [StringStruct(k, v) for k, v in strings.items()])]),
+              VarFileInfo([VarStruct("Translation", [0x0409, 1200])])],
+    )
+
 # PNG icons would need Pillow to convert on macOS; the Windows .ico is used as-is.
 icon = os.path.join(ASSETS, "icon.ico") if sys.platform == "win32" else None
 exe = EXE(
@@ -39,6 +66,7 @@ exe = EXE(
     name=APP_NAME,
     console=False,
     icon=icon,
+    version=windows_version_info() if sys.platform == "win32" else None,
 )
 
 extra_bins = []
@@ -53,6 +81,7 @@ if sys.platform == "darwin":
         coll,
         name=f"{APP_NAME}.app",
         icon=None,
-        bundle_identifier="io.github.polymaze.architect",
-        info_plist={"CFBundleShortVersionString": "2.0.0", "NSHighResolutionCapable": True},
+        bundle_identifier="io.github.mgriot.polymazearchitect",
+        version=VERSION,
+        info_plist={"CFBundleShortVersionString": VERSION, "NSHighResolutionCapable": True},
     )
