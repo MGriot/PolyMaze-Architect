@@ -76,13 +76,15 @@ buildozer android debug
 
 The first build downloads the Android SDK/NDK (several GB) and takes 20–40 minutes; later builds are incremental. The APK lands in `bin/`.
 
-Two workarounds for a bug in python-for-android v2026.05.09 ([kivy/python-for-android#3364](https://github.com/kivy/python-for-android/issues/3364)). That release re-creates its build venv over an existing one, which mixes two pip versions and fails with `ImportError: cannot import name 'BuildDependencyInstallError'`:
+Workarounds for python-for-android v2026.05.09, the current release:
 
-- `buildozer.spec` builds `arm64-v8a` only, which covers practically all current phones. Add `armeabi-v7a` back once a p4a release includes the fix.
-- Before rebuilding, delete the old venv (CI does this automatically):
-  ```bash
-  rm -rf .buildozer/android/platform/build-*/build/venv
-  ```
+- **Stale build venv** ([kivy/python-for-android#3364](https://github.com/kivy/python-for-android/issues/3364)). p4a re-creates its build venv over an existing one, which mixes two pip versions and fails with `ImportError: cannot import name 'BuildDependencyInstallError'`. So:
+  - `buildozer.spec` builds `arm64-v8a` only, which covers practically all current phones. Add `armeabi-v7a` back once a p4a release includes the fix.
+  - Before rebuilding, delete the old venv (CI does this automatically):
+    ```bash
+    rm -rf .buildozer/android/platform/build-*/build/venv
+    ```
+- **Android wheels**: `charset-normalizer` (pulled in by Kivy's `requests` dependency) is pinned to 3.4.9. From 3.5.0 it publishes Android wheels, which p4a picks for the target but then fails to install with `… android_24_arm64_v8a.whl is not a supported wheel on this platform`.
 
 Install it on a phone with USB debugging enabled:
 

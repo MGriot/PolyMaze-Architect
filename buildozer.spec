@@ -14,7 +14,9 @@ source.exclude_dirs = __pycache__
 version.regex = __version__ = ['"](.*)['"]
 version.filename = %(source.dir)s/polymaze/__init__.py
 
-requirements = python3,kivy==2.3.1
+# charset-normalizer comes in via p4a's kivy recipe (requests). From 3.5.0 it ships Android wheels, which
+# p4a v2026.05.09 resolves for the target but then installs with the host pip, which rejects them.
+requirements = python3,kivy==2.3.1,charset-normalizer==3.4.9
 
 icon.filename = %(source.dir)s/polymaze/assets/icon.png
 presplash.filename = %(source.dir)s/polymaze/assets/presplash.png
